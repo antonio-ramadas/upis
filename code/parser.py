@@ -40,10 +40,10 @@ class Parser:
         delimiter = ','
 
         with open(self.DATASET_PATH + 'activities_data.csv') as f:
-            # TODO: watch out for activities that start on a day and end on the next day
+            # TODO watch out for activities that start on a day and end on the next day
 
             # An activity is spread accross 5 lines
-            # TODO: repetitive code
+            # TODO repetitive code
             lines = [line.strip() for line in list(islice(f, 5))]
 
             while lines:
@@ -54,6 +54,9 @@ class Parser:
                 sensor_activation   = [pd.Timestamp(date + time) for time in lines[3].split(delimiter)]
                 sensor_deactivation = [pd.Timestamp(date + time) for time in lines[4].split(delimiter)]
 
+                # TODO from PyDocs -> Iteratively appending rows to a DataFrame can be more computationally
+                # intensive than a single concatenate. A better solution is to append those rows to a list and
+                # then concatenate the list with the original DataFrame all at once.
                 df = df.append({
                     ActivityDataHeaders.LABEL                     : info[0],
                     ActivityDataHeaders.DATE                      : pd.Timestamp(info[1]),
