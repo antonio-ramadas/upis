@@ -6,20 +6,23 @@ from itertools import islice
 from enum import Enum
 
 class ActivityDataHeaders(Enum):
-    LABEL                     = 'ACTIVITY_LABEL',
-    DATE                      = 'DATE',
-    START_TIME                = 'START_TIME',
-    END_TIME                  = 'END_TIME',
-    SENSOR_IDS                = 'SENSOR_IDS',
-    SENSOR_OBJECTS            = 'SENSOR_OBJECTS',
-    SENSOR_ACTIVATION_TIMES   = 'SENSOR_ACTIVATION_TIMES',
+    def __str__(self):
+        return str(self.value)
+
+    LABEL                     = 'ACTIVITY_LABEL'
+    DATE                      = 'DATE'
+    START_TIME                = 'START_TIME'
+    END_TIME                  = 'END_TIME'
+    SENSOR_IDS                = 'SENSOR_IDS'
+    SENSOR_OBJECTS            = 'SENSOR_OBJECTS'
+    SENSOR_ACTIVATION_TIMES   = 'SENSOR_ACTIVATION_TIMES'
     SENSOR_DEACTIVATION_TIMES = 'SENSOR_DEACTIVATION_TIMES'
 
 class Parser:
-    DATASET_PATH = 'datasets/MIT/subject1/'
+    __DATASET_PATH = 'datasets/MIT/subject1/'
 
     def __read_file(self, filename):
-        return pd.read_csv(self.DATASET_PATH + filename)
+        return pd.read_csv(self.__DATASET_PATH + filename)
 
     def sensors(self):
         return self.__read_file('sensors.csv')
@@ -36,10 +39,10 @@ class Parser:
                                    ActivityDataHeaders.SENSOR_OBJECTS,            \
                                    ActivityDataHeaders.SENSOR_ACTIVATION_TIMES,   \
                                    ActivityDataHeaders.SENSOR_DEACTIVATION_TIMES  ])
-        
+
         delimiter = ','
 
-        with open(self.DATASET_PATH + 'activities_data.csv') as f:
+        with open(self.__DATASET_PATH + 'activities_data.csv') as f:
             # TODO watch out for activities that start on a day and end on the next day
 
             # An activity is spread accross 5 lines
@@ -83,4 +86,4 @@ if __name__ == '__main__':
     print(activities.head())
 
     data = Parser().data()
-
+    print(data.head())
