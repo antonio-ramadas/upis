@@ -18,11 +18,21 @@ class ActivityDataHeaders(Enum):
     SENSOR_ACTIVATION_TIMES   = 'SENSOR_ACTIVATION_TIMES'
     SENSOR_DEACTIVATION_TIMES = 'SENSOR_DEACTIVATION_TIMES'
 
+class DatasetPath(Enum):
+    MIT1 = 'MIT/subject1/'
+    MIT2 = 'MIT/subject2/'
+
 class Parser:
-    __DATASET_PATH = 'datasets/MIT/subject1/'
+    __DATASET_PATH = ''
+
+    def __init__(self, ds = DatasetPath.MIT1):
+        self.__DATASET_PATH = 'datasets/' + ds.value
 
     def __read_file(self, filename):
         return pd.read_csv(self.__DATASET_PATH + filename)
+    
+    def __read_n_lines(self, file, n=5):
+        return [line.strip() for line in list(islice(file, n))]
 
     def sensors(self):
         return self.__read_file('sensors.csv')
@@ -43,11 +53,10 @@ class Parser:
         delimiter = ','
 
         with open(self.__DATASET_PATH + 'activities_data.csv') as f:
-            # TODO watch out for activities that start on a day and end on the next day
-
-            # An activity is spread accross 5 lines
-            # TODO repetitive code
-            lines = [line.strip() for line in list(islice(f, 5))]
+            # An activity is defined on 5 lines
+            n=5
+            rows = []
+            lines = self.__read_n_lines(f, n=n)
 
             while lines:
                 info                = lines[0].split(delimiter)
@@ -57,21 +66,21 @@ class Parser:
                 sensor_activation   = [pd.Timestamp(date + time) for time in lines[3].split(delimiter)]
                 sensor_deactivation = [pd.Timestamp(date + time) for time in lines[4].split(delimiter)]
 
-                # TODO from PyDocs -> Iteratively appending rows to a DataFrame can be more computationally
-                # intensive than a single concatenate. A better solution is to append those rows to a list and
-                # then concatenate the list with the original DataFrame all at once.
-                df = df.append({
-                    ActivityDataHeaders.LABEL                     : info[0],
-                    ActivityDataHeaders.DATE                      : pd.Timestamp(info[1]),
-                    ActivityDataHeaders.START_TIME                : pd.Timestamp(date + info[2]),
-                    ActivityDataHeaders.END_TIME                  : pd.Timestamp(date + info[3]),
-                    ActivityDataHeaders.SENSOR_IDS                : sensor_ids,
-                    ActivityDataHeaders.SENSOR_OBJECTS            : sensor_objects,
-                    ActivityDataHeaders.SENSOR_ACTIVATION_TIMES   : sensor_activation,
-                    ActivityDataHeaders.SENSOR_DEACTIVATION_TIMES : sensor_deactivation
-                }, ignore_index=True)
+                rows += [{
+                            ActivityDataHeaders.LABEL                     : info[0],
+                            ActivityDataHeaders.DATE                      : pd.Timestamp(info[1]),
+                            ActivityDataHeaders.START_TIME                : pd.Timestamp(date + info[2]),
+                            ActivityDataHeaders.END_TIME                  : pd.Timestamp(date + info[3]),
+                            ActivityDataHeaders.SENSOR_IDS                : sensor_ids,
+                            ActivityDataHeaders.SENSOR_OBJECTS            : sensor_objects,
+                            ActivityDataHeaders.SENSOR_ACTIVATION_TIMES   : sensor_activation,
+                            ActivityDataHeaders.SENSOR_DEACTIVATION_TIMES : sensor_deactivation
+                        }]
 
-                lines = [line.strip() for line in list(islice(f, 5))]
+                lines = self.__read_n_lines(f, n=n)
+
+        # According to Python Documentation, it is faster to append a chunk than small pieces
+        df = df.append(rows)
         
         return df
 
