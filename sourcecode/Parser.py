@@ -41,14 +41,14 @@ class Parser:
         return self.__read_file('activities.csv')
 
     def data(self):
-        df = pd.DataFrame(columns=[ActivityDataHeaders.LABEL,                     \
-                                   ActivityDataHeaders.DATE,                      \
-                                   ActivityDataHeaders.START_TIME,                \
-                                   ActivityDataHeaders.END_TIME,                  \
-                                   ActivityDataHeaders.SENSOR_IDS,                \
-                                   ActivityDataHeaders.SENSOR_OBJECTS,            \
-                                   ActivityDataHeaders.SENSOR_ACTIVATION_TIMES,   \
-                                   ActivityDataHeaders.SENSOR_DEACTIVATION_TIMES  ])
+        df = pd.DataFrame(columns=[ActivityDataHeaders.LABEL,
+                                   ActivityDataHeaders.DATE,
+                                   ActivityDataHeaders.START_TIME,
+                                   ActivityDataHeaders.END_TIME,
+                                   ActivityDataHeaders.SENSOR_IDS,
+                                   ActivityDataHeaders.SENSOR_OBJECTS,
+                                   ActivityDataHeaders.SENSOR_ACTIVATION_TIMES,
+                                   ActivityDataHeaders.SENSOR_DEACTIVATION_TIMES])
 
         delimiter = ','
 

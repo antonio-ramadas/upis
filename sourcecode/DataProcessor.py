@@ -1,14 +1,9 @@
 #!/usr/bin/python3
 
-# TODO Fix this workaround of importing a module in a subdirectory
-import os
-import sys
-sys.path.append(os.getcwd() + '/code')
-
 import pandas as pd
 import numpy as np
 from enum import Enum
-from parser import Parser, DatasetPath, ActivityDataHeaders
+from Parser import Parser, DatasetPath, ActivityDataHeaders
 
 class SensorProcessedDataHeaders(Enum):
     def __str__(self):
