@@ -2,18 +2,8 @@
 
 import pandas as pd
 import numpy as np
-from enum import Enum
 from Parser import Parser, DatasetPath, ActivityDataHeaders
-
-
-class SensorProcessedDataHeaders(Enum):
-    def __str__(self):
-        return str(self.value)
-    
-    ID       = 'SENSOR_ID'
-    ACTIVITY = 'ACTIVITY'
-    START    = 'START'
-    END      = 'END'
+from Headers import SensorProcessedDataHeaders
 
 
 class DataProcessor:

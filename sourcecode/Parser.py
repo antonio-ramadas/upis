@@ -4,23 +4,13 @@ import pandas as pd
 
 from itertools import islice
 from enum import Enum
+from Headers import ActivityDataHeaders
 
-class ActivityDataHeaders(Enum):
-    def __str__(self):
-        return str(self.value)
-
-    LABEL                     = 'ACTIVITY_LABEL'
-    DATE                      = 'DATE'
-    START_TIME                = 'START_TIME'
-    END_TIME                  = 'END_TIME'
-    SENSOR_IDS                = 'SENSOR_IDS'
-    SENSOR_OBJECTS            = 'SENSOR_OBJECTS'
-    SENSOR_ACTIVATION_TIMES   = 'SENSOR_ACTIVATION_TIMES'
-    SENSOR_DEACTIVATION_TIMES = 'SENSOR_DEACTIVATION_TIMES'
 
 class DatasetPath(Enum):
     MIT1 = 'MIT/subject1/'
     MIT2 = 'MIT/subject2/'
+
 
 class Parser:
     __DATASET_PATH = ''
