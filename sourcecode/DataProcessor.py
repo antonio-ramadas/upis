@@ -5,13 +5,16 @@ import numpy as np
 from enum import Enum
 from Parser import Parser, DatasetPath, ActivityDataHeaders
 
+
 class SensorProcessedDataHeaders(Enum):
     def __str__(self):
         return str(self.value)
     
-    ID    = 'SENSOR_ID'
-    START = 'START'
-    END   = 'END'
+    ID       = 'SENSOR_ID'
+    ACTIVITY = 'ACTIVITY'
+    START    = 'START'
+    END      = 'END'
+
 
 class DataProcessor:
     __data = None
@@ -32,15 +35,22 @@ class DataProcessor:
 
         if (filename == 'sensors'):
             sensor_id = SensorProcessedDataHeaders.ID
+            activity  = SensorProcessedDataHeaders.ACTIVITY
             start     = SensorProcessedDataHeaders.START
             end       = SensorProcessedDataHeaders.END
 
-            self.data_processed[sensor_id] = self.data_processed[sensor_id.value]
-            self.data_processed[start]     = pd.to_datetime(self.data_processed[start.value])
-            self.data_processed[end]       = pd.to_datetime(self.data_processed[end.value])
+            rename_columns = {
+                sensor_id.value: sensor_id,
+                activity.value:  activity
+            }
 
-            columns = [column.value for column in SensorProcessedDataHeaders]
-            self.data_processed = self.data_processed.drop(columns=columns)
+            self.data_processed.rename(index=str, columns=rename_columns, inplace=True)
+
+            self.data_processed[start] = pd.to_datetime(self.data_processed[start.value])
+            self.data_processed[end]   = pd.to_datetime(self.data_processed[end.value])
+
+            exclude_columns = {start.value, end.value}
+            self.data_processed.drop(columns=exclude_columns, inplace=True)
 
         return self.data_processed
 
@@ -55,16 +65,18 @@ class DataProcessor:
         for _, row in self.__data.iterrows():
             # Get useful info
             ids   = row[ActivityDataHeaders.SENSOR_IDS]
+            activity_name = row[ActivityDataHeaders.LABEL]
             start = row[ActivityDataHeaders.SENSOR_ACTIVATION_TIMES]
             end   = row[ActivityDataHeaders.SENSOR_DEACTIVATION_TIMES]
 
             # Reshape to only 1 column
-            ids   = np.array(ids).reshape((-1,1))
-            start = np.array(start).reshape((-1,1))
-            end   = np.array(end).reshape((-1,1))
+            ids           = np.array(ids).reshape((-1,1))
+            activity_name = np.tile([[activity_name]], (ids.shape[0],1))
+            start         = np.array(start).reshape((-1,1))
+            end           = np.array(end).reshape((-1,1))
 
             # Stack side-by-side
-            activity = np.hstack((ids,start,end))
+            activity = np.hstack((ids,activity_name,start,end))
 
             # Stack bellow the data gathered so far
             arr = np.vstack((arr,activity))
@@ -73,11 +85,12 @@ class DataProcessor:
 
         return self.data_processed
 
+
 if __name__ == '__main__':
     print('Dataset processor')
 
     filename = 'sensors'
-    path = DatasetPath.MIT2
+    path = DatasetPath.MIT1
 
     dp = DataProcessor(path=path)
     dp.process_sensors()
