@@ -49,7 +49,7 @@ class DataProcessor:
         self.data_processed.to_csv(file, index=False)
 
     def process_sensors(self):
-        columns = [column.value for column in SensorProcessedDataHeaders]
+        columns = [column for column in SensorProcessedDataHeaders]
         arr = np.empty((0,len(columns)))
 
         for _, row in self.__data.iterrows():
