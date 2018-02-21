@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from enum import Enum
+from enum import Enum, auto
 
 class SensorProcessedDataHeaders(Enum):
     def __str__(self):
@@ -24,3 +24,8 @@ class ActivityDataHeaders(Enum):
     SENSOR_OBJECTS            = 'SENSOR_OBJECTS'
     SENSOR_ACTIVATION_TIMES   = 'SENSOR_ACTIVATION_TIMES'
     SENSOR_DEACTIVATION_TIMES = 'SENSOR_DEACTIVATION_TIMES'
+
+
+class NaiveBayesType(Enum):
+    SINGLE   = auto()
+    MULTIPLE = auto()
