@@ -8,12 +8,11 @@ from sklearn.naive_bayes import GaussianNB
 
 
 class NaiveBayes:
-    __data = None
-    __encoder = LabelEncoder()
-    __nb = GaussianNB()
 
     def __init__(self, data):
         self.__data = data
+        self.__encoder = LabelEncoder()
+        self.__nb = GaussianNB()
 
     def fit(self):
         x = self.__data[SensorProcessedDataHeaders.ID].values.reshape(-1, 1)

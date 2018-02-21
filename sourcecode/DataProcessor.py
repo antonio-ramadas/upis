@@ -7,23 +7,21 @@ from Headers import SensorProcessedDataHeaders
 
 
 class DataProcessor:
-    __data = None
-    __path = None
-    data_processed = None
 
     def __init__(self, data=None, path=DatasetPath.MIT1):
-        if (data is None):
+        if data is None:
             self.__data = Parser(path).data()
         else:
             self.__data = data
 
         self.__path = path
-    
+        self.data_processed = None
+
     def read(self, filename='sensors', path=DatasetPath.MIT1):
         file = 'processed/' + path.value + filename + '.csv'
         self.data_processed = pd.read_csv(file)
 
-        if (filename == 'sensors'):
+        if filename == 'sensors':
             sensor_id = SensorProcessedDataHeaders.ID
             activity  = SensorProcessedDataHeaders.ACTIVITY
             start     = SensorProcessedDataHeaders.START
