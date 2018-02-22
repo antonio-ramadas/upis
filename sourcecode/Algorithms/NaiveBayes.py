@@ -51,7 +51,7 @@ class NaiveBayes:
         devices = set()
 
         for group_name, group in grouped:
-            group.sort_values(by=col_start, ascending=False, inplace=True)
+            group.sort_values(by=col_start, ascending=True, inplace=True)
 
             # Difference between rows considering the start time
             group[col_start] = group[col_start].diff()
