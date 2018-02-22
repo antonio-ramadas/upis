@@ -47,15 +47,15 @@ class NaiveBayes:
         grouped = self.__data.groupby(by=SensorProcessedDataHeaders.ACTIVITY, sort=False)
         window_size *= 60  # convert minutes to seconds
 
-        # List of devices acting together
-        devices = set()
-
         for group_name, group in grouped:
+            # This produces a warning due to inplace. It is safe to ignore it.
             group.sort_values(by=col_start, ascending=True, inplace=True)
 
             # Difference between rows considering the start time
+            # This produces a warning due to the assignment. It is safe to ignore it.
             group[col_start] = group[col_start].diff()
 
+            # List of devices acting together
             devices = set()
 
             for _, row in group.iterrows():
