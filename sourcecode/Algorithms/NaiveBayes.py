@@ -18,6 +18,36 @@ class NaiveBayes:
 
     def __fit_multiple(self):
         print('Not working yet')
+
+        col_id = SensorProcessedDataHeaders.ID
+        col_start = SensorProcessedDataHeaders.START
+
+        number_of_devices = self.__data[col_id].unique().size
+        x = np.empty((0, number_of_devices))
+
+        grouped = self.__data.groupby(by=SensorProcessedDataHeaders.ACTIVITY, sort=False)
+        window_size = 15  # minutes
+
+        for group_name, group in grouped:
+            group.sort_values(by=col_start, ascending=False, inplace=True)
+
+            # Difference between rows considering the start time
+            group[col_start] = group[col_start].diff()
+
+            first = True
+            devices = {}
+
+            for _, row in group.iterrows():
+                if first:
+                    devices |= row[col_id]
+                    continue
+
+                #if row[col_start] > window_size
+
+                first = False
+                devices |= row[col_id]
+
+
         """
         self.__encoder.fit(self.__data[SensorProcessedDataHeaders.ID].unique())
         x = self.__encoder.transform(self.__data[SensorProcessedDataHeaders.ID])
@@ -55,8 +85,8 @@ if __name__ == '__main__':
     dp.process_sensors()
     data = dp.data_processed
 
-    nb = NaiveBayes(data, NaiveBayesType.MULTIPLE)
-    nb.fit()
+    #nb = NaiveBayes(data, NaiveBayesType.MULTIPLE)
+    #nb.fit()
 
     sensor = 100
     #print('Prediction of the activity when sensor', sensor, 'is active:', nb.predict(sensor))
