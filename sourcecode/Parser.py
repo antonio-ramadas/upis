@@ -8,6 +8,9 @@ from Headers import ActivityDataHeaders
 
 
 class DatasetPath(Enum):
+    """
+    Dataset paths. Only the ones available here are possible to be used.
+    """
     MIT1 = 'MIT/subject1/'
     MIT2 = 'MIT/subject2/'
 
@@ -15,13 +18,13 @@ class DatasetPath(Enum):
 class Parser:
     __DATASET_PATH = ''
 
-    def __init__(self, ds = DatasetPath.MIT1):
+    def __init__(self, ds: DatasetPath=DatasetPath.MIT1):
         self.__DATASET_PATH = 'datasets/' + ds.value
 
-    def __read_file(self, filename):
+    def __read_file(self, filename: str):
         return pd.read_csv(self.__DATASET_PATH + filename)
     
-    def __read_n_lines(self, file, n=5):
+    def __read_n_lines(self, file: iter, n=5):
         return [line.strip() for line in list(islice(file, n))]
 
     def sensors(self):

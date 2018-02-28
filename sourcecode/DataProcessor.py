@@ -8,7 +8,16 @@ from Headers import SensorProcessedDataHeaders
 
 class DataProcessor:
 
-    def __init__(self, data=None, path=DatasetPath.MIT1):
+    def __init__(self, data: pd.DataFrame=None, path: DatasetPath=DatasetPath.MIT1):
+        """
+        Stores the data variable to an instance variable. If there is not one present (None is the default) then it
+        parses the data from the path given (argument also optional).
+        Lastly, the initialization does not process automatically the data which may be done by simply calling
+        *process_sensors()*
+
+        :param data: Pandas DataFrame with the parsed data
+        :param path: Path to the file (dataset) to be read
+        """
         if data is None:
             self.__data = Parser(path).data()
         else:
@@ -17,7 +26,14 @@ class DataProcessor:
         self.__path = path
         self.data_processed = None
 
-    def read(self, filename='sensors', path=DatasetPath.MIT1):
+    def read(self, filename: str='sensors', path: DatasetPath=DatasetPath.MIT1):
+        """
+        Read the **processed data** from a csv file to a Pandas DataFrame.
+
+        :param filename: Name of the file (exclude the csv extension)
+        :param path: Path to the file (exclude the file)
+        :return: Pandas DataFrame of the file read
+        """
         file = 'processed/' + path.value + filename + '.csv'
         self.data_processed = pd.read_csv(file)
 
@@ -42,20 +58,34 @@ class DataProcessor:
 
         return self.data_processed
 
-    def save(self, filename='sensors', path=DatasetPath.MIT1):
+    def save(self, filename: str='sensors', path: DatasetPath=DatasetPath.MIT1):
+        """
+        Dump the processed data to a csv file.
+
+        :param filename: Name of the file (without the csv extension)
+        :param path: Path to the file (without the file name)
+        """
         file = 'processed/' + path.value + filename + '.csv'
         self.data_processed.to_csv(file, index=False)
 
     def process_sensors(self):
+        """
+        It processes the original data and stores it to a instance variable. The original data is the one parsed from
+        *activities_data.csv*. This method parses the original data where each row is an entry containing the sensor id,
+        its activity and start and end timestamps. This information is stored on the variable instance *data_processed*
+        which is also returned.
+
+        :return: Processed data in a Pandas DataFrame structure
+        """
         columns = [column for column in SensorProcessedDataHeaders]
         arr = np.empty((0,len(columns)))
 
         for _, row in self.__data.iterrows():
             # Get useful info
-            ids   = row[ActivityDataHeaders.SENSOR_IDS]
+            ids           = row[ActivityDataHeaders.SENSOR_IDS]
             activity_name = row[ActivityDataHeaders.LABEL]
-            start = row[ActivityDataHeaders.SENSOR_ACTIVATION_TIMES]
-            end   = row[ActivityDataHeaders.SENSOR_DEACTIVATION_TIMES]
+            start         = row[ActivityDataHeaders.SENSOR_ACTIVATION_TIMES]
+            end           = row[ActivityDataHeaders.SENSOR_DEACTIVATION_TIMES]
 
             # Reshape to only 1 column
             ids           = np.array(ids).reshape((-1,1))
