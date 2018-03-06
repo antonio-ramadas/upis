@@ -5,6 +5,7 @@ from Headers import SensorProcessedDataHeaders
 from sklearn.ensemble import RandomForestClassifier
 import pandas as pd
 
+
 class RandomForest:
 
     def __init__(self, data: pd.DataFrame):
