@@ -2,6 +2,6 @@ language: python
 python:
   - "3.6"
 before_install:
-  - chmod +x ./sourcecode/DataProcessor.py
+  - chmod +x ./run_python_scripts.py
 script:
-  - python ./sourcecode/DataProcessor.py
+  - sh ./run_python_scripts.py

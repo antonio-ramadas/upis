@@ -114,5 +114,3 @@ if __name__ == '__main__':
     dp.process_sensors()
     dp.save(filename, path)
     data = dp.read(filename, path)
-
-    raise Exception
