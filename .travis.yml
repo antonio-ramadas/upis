@@ -4,4 +4,4 @@ python:
 before_install:
   - chmod +x ./sourcecode/DataProcessor.py
 script:
-  - ./sourcecode/DataProcessor.py
+  - python ./sourcecode/DataProcessor.py
