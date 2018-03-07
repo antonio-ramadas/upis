@@ -1,0 +1,7 @@
+language: python
+python:
+  - "3.6"
+before_install:
+  - chmod +x ./run_python_scripts.sh
+script:
+  - sh ./run_python_scripts.sh

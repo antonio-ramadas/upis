@@ -37,6 +37,8 @@ class RandomForest:
 
 
 if __name__ == '__main__':
+    pass
+    """
     print('Random Forest')
 
     dp = DataProcessor()
@@ -46,3 +48,4 @@ if __name__ == '__main__':
     rf.fit()
 
     print(rf.predict())
+    """
