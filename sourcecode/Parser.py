@@ -31,7 +31,7 @@ class Parser:
         return self.__read_file('sensors.csv')
 
     def activities(self):
-        return self.__read_file('activities.csv')
+        return self.__read_file('Activities.csv')
 
     def data(self):
         df = pd.DataFrame(columns=[ActivityDataHeaders.LABEL,
