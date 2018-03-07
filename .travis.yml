@@ -1,6 +1,8 @@
 language: python
 python:
   - "3.6"
+install:
+  - pip3 install -r requirements.txt
 before_install:
   - chmod +x ./sourcecode/DataProcessor.py
 script:
