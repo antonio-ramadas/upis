@@ -16,11 +16,7 @@ class RandomForest:
 
     def __discretize_data(self):
         """
-        Removes START and END columns and process them to a new one: DURATION. The values of this column are the
-        discrete conversion of END - START to intervals: short, medium and long.
-
-        This method may be called multiple times that the effect is the same. If the data is already discretisized, then
-        nothing happens.
+        Check Jupyter Notebooks for full explanation on the methods here applied.
         """
         pass
 
