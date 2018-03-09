@@ -29,7 +29,6 @@ class RandomForest:
         self.__data['duration'] = self.__data['duration'].apply(lambda x: x.total_seconds())
 
         # Categorize the duration of the actions
-        labels = ['ultra_short', 'short', 'medium', 'long']
         if self.__dataset == DatasetPath.MIT1:
             self.__data['duration_categorized'] = pd.cut(self.__data['duration'],
                                                          [-math.inf, 3, 11, 42, math.inf],
