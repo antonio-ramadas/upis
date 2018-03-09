@@ -5,7 +5,7 @@ from Parser import DatasetPath
 from Headers import SensorProcessedDataHeaders
 from sklearn.ensemble import RandomForestClassifier
 import pandas as pd
-
+import math
 
 class RandomForest:
 
@@ -29,13 +29,15 @@ class RandomForest:
         self.__data['duration'] = self.__data['duration'].apply(lambda x: x.total_seconds())
 
         # Categorize the duration of the actions
-        # TODO
-        self.__data['duration_categorized'] = self.__data['duration']
-
+        labels = ['ultra_short', 'short', 'medium', 'long']
         if self.__dataset == DatasetPath.MIT1:
-            pass
+            self.__data['duration_categorized'] = pd.cut(self.__data['duration'],
+                                                         [-math.inf, 3, 11, 42, math.inf],
+                                                         labels=labels)
         elif self.__dataset == DatasetPath.MIT2:
-            pass
+            self.__data['duration_categorized'] = pd.cut(self.__data['duration'],
+                                                         [-math.inf, 5, 18, 232, math.inf],
+                                                         labels=labels)
         else:
             raise Exception('Dataset {} discretization not implemented'.format(self.__dataset))
 
@@ -43,7 +45,11 @@ class RandomForest:
         self.__data['weekday'] = self.__data[start].apply(lambda x: x.weekday_name)
 
         # Conversion of the start activity to the period of the day
-        # TODO
+        self.__data['period'] = pd.cut(self.__data['duration'],
+                                       [-math.inf, 6, 12, 17, math.inf],
+                                       labels=['night', 'morning', 'afternoon', 'evening'])
+
+        self.__data.drop(columns=[start, end], inplace=True)
 
     def fit(self):
         activity_column = SensorProcessedDataHeaders.ACTIVITY
