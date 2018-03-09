@@ -1,51 +1,89 @@
 #!/usr/bin/python3
 
 from DataProcessor import DataProcessor
+from Parser import DatasetPath
 from Headers import SensorProcessedDataHeaders
 from sklearn.ensemble import RandomForestClassifier
 import pandas as pd
-
+import math
 
 class RandomForest:
 
-    def __init__(self, data: pd.DataFrame):
-        self.__data = data
-        self.__discretize_data()
+    def __init__(self, data: pd.DataFrame, dataset: DatasetPath):
+        self.__dataset = dataset
+
+        self.__data = self.__discretize_data(data)
 
         self.__rf = RandomForestClassifier()
 
-    def __discretize_data(self):
+    def __discretize_data(self, data: pd.DataFrame) -> pd.DataFrame:
         """
-        Removes START and END columns and process them to a new one: DURATION. The values of this column are the
-        discrete conversion of END - START to intervals: short, medium and long.
+        Check Jupyter Notebooks for full explanation on the methods here applied.
 
-        This method may be called multiple times that the effect is the same. If the data is already discretisized, then
-        nothing happens.
+        Basically, it creates four new columns (duration, duration categorized, weekday and period) and drops two (START
+         and END).
+
+        It returns the argument after being discretized.
+
+        P.S.: May throw an exception if it is not implemented the categorization for the dataset given.
         """
-        pass
+        start = SensorProcessedDataHeaders.START
+        end   = SensorProcessedDataHeaders.END
+
+        # Add a new column containing the duration, in seconds, of each sensor action
+        data.loc[:, 'duration'] = data[end] - data[start]
+        data.loc[:, 'duration'] = data['duration'].apply(lambda x: x.total_seconds())
+
+        # Categorize the duration of the actions
+        if self.__dataset == DatasetPath.MIT1:
+            data.loc[:, 'duration_categorized'] = pd.cut(data['duration'],
+                                                         [-math.inf, 3, 11, 42, math.inf],
+                                                         labels=False)
+        elif self.__dataset == DatasetPath.MIT2:
+            data.loc[:, 'duration_categorized'] = pd.cut(data['duration'],
+                                                         [-math.inf, 5, 18, 232, math.inf],
+                                                         labels=False)
+        else:
+            raise Exception('Dataset {} discretization not implemented'.format(self.__dataset))
+
+        # Conversion to day of the week of the timestamp when the sensor activated
+        data.loc[:, 'weekday'] = data[start].apply(lambda x: x.dayofweek)
+
+        # Conversion of the start activity to the period of the day
+        data.loc[:, 'period'] = pd.cut(data['duration'],
+                                       [-math.inf, 6, 12, 17, math.inf],
+                                       labels=False)
+
+        data = data.drop(columns=[start, end])
+
+        return data
 
     def fit(self):
         activity_column = SensorProcessedDataHeaders.ACTIVITY
 
-        x = self.__data.drop(columns=activity_column, inplace=True)
+        x = self.__data.drop(columns=activity_column)
         y = self.__data[activity_column]
 
         self.__rf.fit(x, y)
 
-    def predict(self):
-        pass
+    def predict(self, test_data: pd.DataFrame):
+        x = self.__discretize_data(test_data)
+
+        x = x.drop(columns=[SensorProcessedDataHeaders.ACTIVITY])
+
+        return self.__rf.predict(x)
 
 
 if __name__ == '__main__':
-    pass
-    """
     print('Random Forest')
 
-    dp = DataProcessor()
+    path = DatasetPath.MIT1
+
+    dp = DataProcessor(path=path)
     data = dp.process_sensors()
 
-    rf = RandomForest(data)
+    rf = RandomForest(data, path)
     rf.fit()
 
-    print(rf.predict())
-    """
+    row = dp.process_sensors().iloc[[0]]
+    print(rf.predict(row))
