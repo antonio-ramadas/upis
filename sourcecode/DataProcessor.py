@@ -103,6 +103,15 @@ class DataProcessor:
 
         return self.data_processed
 
+    def split(self):
+        """
+        Generator of splits. It never stops (watch out for infinite loops if you explicitly do not define a range).
+         - 66% to training data and the rest to test data.
+         - 5/7 are weekdays and the rest is weekend
+        :return: pair of the indices for training and test data
+        """
+        pass
+
 
 if __name__ == '__main__':
     print('Dataset processor')
