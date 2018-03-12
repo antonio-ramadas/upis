@@ -56,7 +56,6 @@ class RandomForest:
 
         data = data.drop(columns=[start, end])
 
-        print(data.head())
         return data
 
     def fit(self):
