@@ -110,8 +110,16 @@ class DataProcessor:
          - 5/7 are weekdays and the rest is weekend
         :return: pair of the indices for training and test data
         """
-        pass
+        if self.data_processed is None:
+            self.process_sensors()
 
+        # Implement cutoff to separate the days (Jupyter Notebooks detail a bit this)
+        # It is being created a new column to tell if the row took action during the weekend
+        # If the action occurred before the cutoff, then it still counts to the previous day
+        cutoff = 5  # cutoff at 5am
+        time_of_the_action = SensorProcessedDataHeaders.START
+        weekdays = self.data_processed[time_of_the_action].apply(lambda x: (x.weekday() - (x.hour < cutoff)) % 7)
+        self.data_processed = self.data_processed.assign(is_weekend=(weekdays >= 5))
 
 if __name__ == '__main__':
     print('Dataset processor')
