@@ -2,6 +2,7 @@
 
 import pandas as pd
 import numpy as np
+from sklearn.model_selection import StratifiedShuffleSplit
 from Parser import Parser, DatasetPath, ActivityDataHeaders
 from Headers import SensorProcessedDataHeaders
 
@@ -103,12 +104,13 @@ class DataProcessor:
 
         return self.data_processed
 
-    def split(self):
+    def split(self, n_folds=10):
         """
-        Generator of splits. It never stops (watch out for infinite loops if you explicitly do not define a range).
+        Generate of splits following specific conditions. The parameter n_splits is the number of folds. By default it
+        is 10-fold.
          - 66% to training data and the rest to test data.
          - 5/7 are weekdays and the rest is weekend
-        :return: pair of the indices for training and test data
+        :return: Generator of indices to split data into training and test set
         """
         if self.data_processed is None:
             self.process_sensors()
@@ -119,7 +121,11 @@ class DataProcessor:
         cutoff = 5  # cutoff at 5am
         time_of_the_action = SensorProcessedDataHeaders.START
         weekdays = self.data_processed[time_of_the_action].apply(lambda x: (x.weekday() - (x.hour < cutoff)) % 7)
-        self.data_processed = self.data_processed.assign(is_weekend=(weekdays >= 5))
+        y = weekdays >= 5  # Saturday and Sunday are 5 and 6, respectively
+
+        sss = StratifiedShuffleSplit(n_splits=n_folds, test_size=0.33)
+        return sss.split(self.data_processed, y)
+
 
 if __name__ == '__main__':
     print('Dataset processor')
