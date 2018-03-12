@@ -118,7 +118,7 @@ class DataProcessor:
         # Implement cutoff to separate the days (Jupyter Notebooks detail a bit this)
         # It is being created a new column to tell if the row took action during the weekend
         # If the action occurred before the cutoff, then it still counts to the previous day
-        cutoff = 5  # cutoff at 5am
+        cutoff             = 5  # cutoff at 5am
         time_of_the_action = SensorProcessedDataHeaders.START
         weekdays = self.data_processed[time_of_the_action].apply(lambda x: (x.weekday() - (x.hour < cutoff)) % 7)
         y = weekdays >= 5  # Saturday and Sunday are 5 and 6, respectively
