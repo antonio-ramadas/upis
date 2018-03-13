@@ -38,20 +38,6 @@ class DataProcessor:
     def data_processed(self, value):
         self.__data_processed = value
 
-    def __get_rows(self, days_of_the_year, days, split):
-        """
-        *split* is an array of indexes of the *days* and *days_of_the_year* is a column from the *data_processed* which
-        indicates the number of the day in the year that the action took place.
-        :return: Pandas DataFrame with the actions that happened on the days indicated by the *split*
-        """
-        # Create function to map from the index to the element
-        f = np.vectorize(lambda x: days[x])
-
-        # Map it
-        mapped = f(split)
-
-        return self.data_processed[days_of_the_year.isin(mapped)]
-
     def read(self, filename: str='sensors'):
         """
         Read the **processed data** from a csv file to a Pandas DataFrame.
@@ -139,17 +125,22 @@ class DataProcessor:
 
         # The data is spread across 2 months, but in the same year (look at the Jupyter Notebook)
         days_of_the_year = self.data_processed[time_of_the_action].apply(lambda x: x.dayofyear)
+        days_of_the_year = days_of_the_year.to_frame()
+        days_of_the_year.rename(index=str, columns={time_of_the_action:'day'}, inplace=True)
 
-        # Implement cutoff to separate the days (Jupyter Notebooks detail a bit this)
-        # It is being created a new column to tell if the row took action during the weekend
-        # If the action occurred before the cutoff, then it still counts to the previous day
+        hours = self.data_processed[time_of_the_action].apply(lambda x: x.hour)
+        hours = hours.to_frame()
+        hours.rename(index=str, columns={time_of_the_action:'hour'}, inplace=True)
+
+        hours_and_days = pd.concat([hours, days_of_the_year], axis=1)
+
         cutoff = 5  # cutoff at 5am
-        is_weekend = self.data_processed[time_of_the_action].apply(lambda x: (x.weekday() - (x.hour < cutoff)) % 7)
+        is_weekend = self.data_processed[time_of_the_action].apply(lambda x: x.weekday())
         is_weekend = is_weekend >= 5  # Saturday and Sunday are 5 and 6, respectively
 
         # Get weekdays and weekends as array of days of the year
-        weekdays = days_of_the_year[is_weekend == False].unique()
-        weekends = days_of_the_year[is_weekend].unique()
+        weekdays = days_of_the_year.loc[is_weekend.__array__() == False, 'day'].unique()
+        weekends = days_of_the_year.loc[is_weekend.__array__(), 'day'].unique()
 
         test_size = 0.33
 
@@ -158,17 +149,41 @@ class DataProcessor:
         ss_weekdays = ShuffleSplit(n_splits=n_folds, test_size=test_size)
         ss_weekends = ShuffleSplit(n_splits=n_folds, test_size=test_size)
 
+        def __get_rows(days, split):
+            """
+            *split* is an array of indexes of the *days* and *days_of_the_year* is a column from the *data_processed* wh
+            ich indicates the number of the day in the year that the action took place.
+            :return: Pandas DataFrame with the actions that happened on the days indicated by the *split*
+            """
+            # Create function to map from the index to the element
+            f = np.vectorize(lambda x: days[x])
+
+            # Map it
+            mapped = f(split)
+
+            # Implement cutoff to separate the days (Jupyter Notebooks detail a bit this)
+            # It is being created a new column to tell if the row took action during the weekend
+            # If the action occurred before the cutoff, then it still counts to the previous day
+
+            # Current day after *cutoff*
+            lhs = hours_and_days['day'].isin(mapped).__array__() & (hours_and_days['hour'].__array__() >= cutoff)
+
+            # Next day until *cutoff*
+            rhs = hours_and_days['day'].isin(mapped+1).__array__() & (hours_and_days['hour'].__array__() < cutoff)
+
+            return self.data_processed[lhs | rhs]
+
         # Iterate over the two generators at once
         for wdays, wend in zip(ss_weekdays.split(weekdays), ss_weekends.split(weekends)):
             wdays_train, wdays_test = wdays
             wend_train,  wend_test  = wend
 
             # Convert the indexes to days and get the actions occurred on that period
-            wdays_train = self.__get_rows(days_of_the_year, weekdays, wdays_train)
-            wdays_test  = self.__get_rows(days_of_the_year, weekdays, wdays_test)
+            wdays_train = __get_rows(weekdays, wdays_train)
+            wdays_test  = __get_rows(weekdays, wdays_test)
 
-            wend_train = self.__get_rows(days_of_the_year, weekends, wend_train)
-            wend_test  = self.__get_rows(days_of_the_year, weekends, wend_test)
+            wend_train = __get_rows(weekends, wend_train)
+            wend_test  = __get_rows(weekends, wend_test)
 
             yield wdays_train.append(wend_train), wdays_test.append(wend_test)
 
