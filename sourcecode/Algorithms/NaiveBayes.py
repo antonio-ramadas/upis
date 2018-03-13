@@ -142,13 +142,15 @@ if __name__ == '__main__':
 
     dp = DataProcessor(path=path)
 
-    nb = NaiveBayes(dp, NaiveBayesType.MULTIPLE)
-    nb.fit(dp.data_processed)
+    for type in [NaiveBayesType.SINGLE, NaiveBayesType.MULTIPLE]:
+        print(type)
+        nb = NaiveBayes(dp, type)
+        nb.fit(dp.data_processed)
 
-    print(nb.predict(dp.process_sensors().iloc[[0]]))
+        print(nb.predict(dp.process_sensors().iloc[[0]]))
 
-    f1, precision, recall, matrices = nb.evaluate()
+        f1, precision, recall, matrices = nb.evaluate()
 
-    print(f'F1        = {f1}')
-    print(f'Precision = {precision}')
-    print(f'Recall    = {recall}')
+        print(f'F1        = {f1}')
+        print(f'Precision = {precision}')
+        print(f'Recall    = {recall}')

@@ -134,11 +134,8 @@ class DataProcessor:
 
         hours_and_days = pd.concat([hours, days_of_the_year], axis=1)
 
-        # Implement cutoff to separate the days (Jupyter Notebooks detail a bit this)
-        # It is being created a new column to tell if the row took action during the weekend
-        # If the action occurred before the cutoff, then it still counts to the previous day
         cutoff = 5  # cutoff at 5am
-        is_weekend = self.data_processed[time_of_the_action].apply(lambda x: (x.weekday() - (x.hour < cutoff)) % 7)
+        is_weekend = self.data_processed[time_of_the_action].apply(lambda x: x.weekday())
         is_weekend = is_weekend >= 5  # Saturday and Sunday are 5 and 6, respectively
 
         # Get weekdays and weekends as array of days of the year
@@ -154,8 +151,8 @@ class DataProcessor:
 
         def __get_rows(days, split):
             """
-            *split* is an array of indexes of the *days* and *days_of_the_year* is a column from the *data_processed* which
-            indicates the number of the day in the year that the action took place.
+            *split* is an array of indexes of the *days* and *days_of_the_year* is a column from the *data_processed* wh
+            ich indicates the number of the day in the year that the action took place.
             :return: Pandas DataFrame with the actions that happened on the days indicated by the *split*
             """
             # Create function to map from the index to the element
@@ -164,8 +161,17 @@ class DataProcessor:
             # Map it
             mapped = f(split)
 
-            return self.data_processed[days_of_the_year['day'].isin(mapped).__array__()]
+            # Implement cutoff to separate the days (Jupyter Notebooks detail a bit this)
+            # It is being created a new column to tell if the row took action during the weekend
+            # If the action occurred before the cutoff, then it still counts to the previous day
 
+            # Current day after *cutoff*
+            lhs = hours_and_days['day'].isin(mapped).__array__() & (hours_and_days['hour'].__array__() >= cutoff)
+
+            # Next day until *cutoff*
+            rhs = hours_and_days['day'].isin(mapped+1).__array__() & (hours_and_days['hour'].__array__() < cutoff)
+
+            return self.data_processed[lhs | rhs]
 
         # Iterate over the two generators at once
         for wdays, wend in zip(ss_weekdays.split(weekdays), ss_weekends.split(weekends)):
