@@ -11,8 +11,8 @@ import pandas as pd
 
 class NaiveBayes:
 
-    def __init__(self, data, type=NaiveBayesType.SINGLE):
-        self.__data    = data
+    def __init__(self, dp: DataProcessor, type=NaiveBayesType.SINGLE):
+        self.__data    = dp.data_processed
         self.__type    = type
         # __encoder is currently only being used in MULTIPLE
         self.__encoder = LabelBinarizer()
@@ -106,10 +106,8 @@ if __name__ == '__main__':
     path = DatasetPath.MIT1
 
     dp = DataProcessor(path=path)
-    dp.process_sensors()
-    data = dp.data_processed
 
-    nb = NaiveBayes(data, NaiveBayesType.MULTIPLE)
+    nb = NaiveBayes(dp, NaiveBayesType.MULTIPLE)
     nb.fit()
 
     sensor = ['100', '101', '95', '54', '93','72','67','108']

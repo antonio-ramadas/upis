@@ -9,7 +9,7 @@ from Headers import SensorProcessedDataHeaders
 
 class DataProcessor:
 
-    def __init__(self, data: pd.DataFrame=None, path: DatasetPath=DatasetPath.MIT1):
+    def __init__(self, data: pd.DataFrame=None, path=DatasetPath.MIT1):
         """
         Stores the data variable to an instance variable. If there is not one present (None is the default) then it
         parses the data from the path given (argument also optional).
@@ -24,8 +24,19 @@ class DataProcessor:
         else:
             self.__data = data
 
-        self.__path = path
-        self.data_processed = None
+        self.path = path
+        self.__data_processed = None
+
+    @property
+    def data_processed(self):
+        if self.__data_processed is None:
+            self.process_sensors()
+
+        return self.__data_processed
+
+    @data_processed.setter
+    def data_processed(self, value):
+        self.__data_processed = value
 
     def __get_rows(self, days_of_the_year, days, split):
         """
@@ -41,15 +52,14 @@ class DataProcessor:
 
         return self.data_processed[days_of_the_year.isin(mapped)]
 
-    def read(self, filename: str='sensors', path: DatasetPath=DatasetPath.MIT1):
+    def read(self, filename: str='sensors'):
         """
         Read the **processed data** from a csv file to a Pandas DataFrame.
 
         :param filename: Name of the file (exclude the csv extension)
-        :param path: Path to the file (exclude the file)
         :return: Pandas DataFrame of the file read
         """
-        file = 'processed/' + path.value + filename + '.csv'
+        file = 'processed/' + self.path.value + filename + '.csv'
         self.data_processed = pd.read_csv(file)
 
         if filename == 'sensors':
@@ -73,14 +83,14 @@ class DataProcessor:
 
         return self.data_processed
 
-    def save(self, filename: str='sensors', path: DatasetPath=DatasetPath.MIT1):
+    def save(self, filename: str='sensors'):
         """
         Dump the processed data to a csv file.
 
         :param filename: Name of the file (without the csv extension)
         :param path: Path to the file (without the file name)
         """
-        file = 'processed/' + path.value + filename + '.csv'
+        file = 'processed/' + self.path.value + filename + '.csv'
         self.data_processed.to_csv(file, index=False)
 
     def process_sensors(self):
@@ -125,9 +135,6 @@ class DataProcessor:
          - 66% to training data and the rest to test data.
         :return: Generator of Pandas DataFrames that split data into training and test set
         """
-        if self.data_processed is None:
-            self.process_sensors()
-
         time_of_the_action = SensorProcessedDataHeaders.START
 
         # The data is spread across 2 months, but in the same year (look at the Jupyter Notebook)
@@ -175,8 +182,7 @@ if __name__ == '__main__':
     path = DatasetPath.MIT1
 
     dp = DataProcessor(path=path)
-    dp.process_sensors()
-    dp.save(filename, path)
-    data = dp.read(filename, path)
+    dp.save(filename)
+    data = dp.read(filename)
 
     dp.split()

@@ -7,12 +7,12 @@ from sklearn.ensemble import RandomForestClassifier
 import pandas as pd
 import math
 
+
 class RandomForest:
+    def __init__(self, dp:DataProcessor):
+        self.__dataset = dp.path
 
-    def __init__(self, data: pd.DataFrame, dataset: DatasetPath):
-        self.__dataset = dataset
-
-        self.__data = self.__discretize_data(data)
+        self.__data = self.__discretize_data(dp.data_processed)
 
         self.__rf = RandomForestClassifier()
 
@@ -80,9 +80,8 @@ if __name__ == '__main__':
     path = DatasetPath.MIT1
 
     dp = DataProcessor(path=path)
-    data = dp.process_sensors()
 
-    rf = RandomForest(data, path)
+    rf = RandomForest(dp)
     rf.fit()
 
     row = dp.process_sensors().iloc[[0]]
