@@ -2,7 +2,7 @@
 
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.model_selection import ShuffleSplit
 from Parser import Parser, DatasetPath, ActivityDataHeaders
 from Headers import SensorProcessedDataHeaders
 
@@ -26,6 +26,20 @@ class DataProcessor:
 
         self.__path = path
         self.data_processed = None
+
+    def __get_rows(self, days_of_the_year, days, split):
+        """
+        *split* is an array of indexes of the *days* and *days_of_the_year* is a column from the *data_processed* which
+        indicates the number of the day in the year that the action took place.
+        :return: Pandas DataFrame with the actions that happened on the days indicated by the *split*
+        """
+        # Create function to map from the index to the element
+        f = np.vectorize(lambda x: days[x])
+
+        # Map it
+        mapped = f(split)
+
+        return self.data_processed[days_of_the_year.isin(mapped)]
 
     def read(self, filename: str='sensors', path: DatasetPath=DatasetPath.MIT1):
         """
@@ -109,22 +123,49 @@ class DataProcessor:
         Generate of splits following specific conditions. The parameter n_splits is the number of folds. By default it
         is 10-fold.
          - 66% to training data and the rest to test data.
-         - 5/7 are weekdays and the rest is weekend
-        :return: Generator of indices to split data into training and test set
+        :return: Generator of Pandas DataFrames that split data into training and test set
         """
         if self.data_processed is None:
             self.process_sensors()
 
+        time_of_the_action = SensorProcessedDataHeaders.START
+
+        # The data is spread across 2 months, but in the same year (look at the Jupyter Notebook)
+        days_of_the_year = self.data_processed[time_of_the_action].apply(lambda x: x.dayofyear)
+
         # Implement cutoff to separate the days (Jupyter Notebooks detail a bit this)
         # It is being created a new column to tell if the row took action during the weekend
         # If the action occurred before the cutoff, then it still counts to the previous day
-        cutoff             = 5  # cutoff at 5am
-        time_of_the_action = SensorProcessedDataHeaders.START
-        weekdays = self.data_processed[time_of_the_action].apply(lambda x: (x.weekday() - (x.hour < cutoff)) % 7)
-        y = weekdays >= 5  # Saturday and Sunday are 5 and 6, respectively
+        cutoff = 5  # cutoff at 5am
+        is_weekend = self.data_processed[time_of_the_action].apply(lambda x: (x.weekday() - (x.hour < cutoff)) % 7)
+        is_weekend = is_weekend >= 5  # Saturday and Sunday are 5 and 6, respectively
 
-        sss = StratifiedShuffleSplit(n_splits=n_folds, test_size=0.33)
-        return sss.split(self.data_processed, y)
+        # Get weekdays and weekends as array of days of the year
+        weekdays = days_of_the_year[is_weekend == False].unique()
+        weekends = days_of_the_year[is_weekend].unique()
+
+        test_size = 0.33
+
+        # Split is made on the days and not on the rows
+        # One shuffle is for weekdays and the other weekends. This way, we ensure that the weekends are also present
+        ss_weekdays = ShuffleSplit(n_splits=n_folds, test_size=test_size)
+        ss_weekends = ShuffleSplit(n_splits=n_folds, test_size=test_size)
+
+        # Iterate over the two generators at once
+        for wdays, wend in zip(ss_weekdays.split(weekdays), ss_weekends.split(weekends)):
+            wdays_train, wdays_test = wdays
+            wend_train,  wend_test  = wend
+
+            # Convert the indexes to days and get the actions occurred on that period
+            wdays_train = self.__get_rows(days_of_the_year, weekdays, wdays_train)
+            wdays_test  = self.__get_rows(days_of_the_year, weekdays, wdays_test)
+
+            wend_train = self.__get_rows(days_of_the_year, weekends, wend_train)
+            wend_test  = self.__get_rows(days_of_the_year, weekends, wend_test)
+
+            yield wdays_train.append(wend_train), wdays_test.append(wend_test)
+
+            #self.data_processed[days_of_the_year.isin(np.vectorize(lambda x: weekdays[x])(wdays_train))]
 
 
 if __name__ == '__main__':
@@ -137,3 +178,5 @@ if __name__ == '__main__':
     dp.process_sensors()
     dp.save(filename, path)
     data = dp.read(filename, path)
+
+    dp.split()
