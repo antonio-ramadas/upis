@@ -11,7 +11,7 @@ class Metrics:
         self.__prediction = prediction
 
     def __apply(self, f):
-        return f(self.__ground_truth, self.__prediction, average='micro')
+        return f(self.__ground_truth, self.__prediction, average='macro')
 
     def f1(self):
         return self.__apply(skmetrics.f1_score)
