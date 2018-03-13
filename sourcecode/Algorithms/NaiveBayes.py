@@ -142,12 +142,13 @@ if __name__ == '__main__':
 
     dp = DataProcessor(path=path)
 
-    nb = NaiveBayes(dp, NaiveBayesType.SINGLE)
+    nb = NaiveBayes(dp, NaiveBayesType.MULTIPLE)
     nb.fit(dp.data_processed)
 
     print(nb.predict(dp.process_sensors().iloc[[0]]))
 
-    #sensor = ['100', '101', '95', '54', '93','72','67','108']
-    #print('Prediction of the activity when sensor', sensor, 'is active:', nb.predict(sensor))
+    f1, precision, recall, matrices = nb.evaluate()
 
-    nb.evaluate()
+    print(f'F1        = {f1}')
+    print(f'Precision = {precision}')
+    print(f'Recall    = {recall}')
