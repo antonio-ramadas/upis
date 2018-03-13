@@ -37,12 +37,8 @@ class NaiveBayes:
         col_id = SensorProcessedDataHeaders.ID
         col_start = SensorProcessedDataHeaders.START
 
-        # Fit the encoder to all known sensors
-        self.__encoder.fit(data[col_id].unique())
-
         # x is the training data
-        number_of_devices = data[col_id].unique().size
-        x = np.empty((0, number_of_devices))
+        x = np.empty((0, self.__number_of_devices))
         y = np.empty((0, 1))
 
         grouped = data.groupby(by=SensorProcessedDataHeaders.ACTIVITY, sort=False)
@@ -74,7 +70,12 @@ class NaiveBayes:
         return x, y
 
     def __fit_multiple(self, data):
-        self.__number_of_devices = data[SensorProcessedDataHeaders.ID].unique().size
+        col_id = SensorProcessedDataHeaders.ID
+
+        # Fit the encoder to all known sensors
+        self.__encoder.fit(data[col_id].unique())
+
+        self.__number_of_devices = data[col_id].unique().size
 
         x, y = self.__encode_input_of_multiple(data)
         self.__nb.fit(x, y)
@@ -90,19 +91,17 @@ class NaiveBayes:
         elif self.__type is NaiveBayesType.MULTIPLE:
             self.__fit_multiple(data)
 
-    def predict(self, sensor_id):
-        if self.__type is NaiveBayesType.MULTIPLE:
-            # *__number_of_devices* was previously created in *__fit_multiple*
-            x = np.empty((0, self.__number_of_devices))
+    def predict(self, sensor):
+        x = None
 
-            sensor_id = self.__add_devices_with_encoder(x, sensor_id)
+        if self.__type is NaiveBayesType.SINGLE:
+            x = sensor[SensorProcessedDataHeaders.ID].values.reshape(-1, 1)
+        elif self.__type is NaiveBayesType.MULTIPLE:
+            x, _ = self.__encode_input_of_multiple(sensor)
 
-        return self.__nb.predict(sensor_id)
+        return self.__nb.predict(x)
 
     def evaluate(self, n_folds=10):
-        raise NotImplementedError
-
-        activity_column = SensorProcessedDataHeaders.ACTIVITY
         matrices  = []
         f1        = 0
         precision = 0
@@ -110,10 +109,17 @@ class NaiveBayes:
 
         for train, test in self.__dp.split(n_folds=n_folds):
             self.fit(train)
-            # TODO This prediction has to change
+
+            truth = None
+
+            if self.__type is NaiveBayesType.SINGLE:
+                truth = test[SensorProcessedDataHeaders.ACTIVITY]
+            elif self.__type is NaiveBayesType.MULTIPLE:
+                _, truth = self.__encode_input_of_multiple(test)
+
             prediction = self.predict(test)
 
-            metric = Metrics(test[activity_column], prediction)
+            metric = Metrics(truth, prediction)
 
             f1        += metric.f1()
             precision += metric.precision()
@@ -136,8 +142,12 @@ if __name__ == '__main__':
 
     dp = DataProcessor(path=path)
 
-    nb = NaiveBayes(dp, NaiveBayesType.MULTIPLE)
+    nb = NaiveBayes(dp, NaiveBayesType.SINGLE)
     nb.fit(dp.data_processed)
 
-    sensor = ['100', '101', '95', '54', '93','72','67','108']
-    print('Prediction of the activity when sensor', sensor, 'is active:', nb.predict(sensor))
+    print(nb.predict(dp.process_sensors().iloc[[0]]))
+
+    #sensor = ['100', '101', '95', '54', '93','72','67','108']
+    #print('Prediction of the activity when sensor', sensor, 'is active:', nb.predict(sensor))
+
+    nb.evaluate()
