@@ -4,7 +4,7 @@ from Parser import DatasetPath
 from DataProcessor import DataProcessor
 from Headers import SensorProcessedDataHeaders, NaiveBayesType
 from sklearn.preprocessing import LabelBinarizer
-from sklearn.naive_bayes import GaussianNB
+from sklearn.naive_bayes import MultinomialNB
 from Metrics import *
 import numpy as np
 import pandas as pd
@@ -17,7 +17,7 @@ class NaiveBayes:
         self.__type    = type
         # __encoder is currently only being used in MULTIPLE
         self.__encoder = LabelBinarizer()
-        self.__nb      = GaussianNB()
+        self.__nb      = MultinomialNB()
 
     def __add_devices_with_encoder(self, x, devices):
         """
@@ -149,7 +149,7 @@ if __name__ == '__main__':
 
         print(nb.predict(dp.process_sensors().iloc[[0]]))
 
-        f1, precision, recall, matrices = nb.evaluate()
+        f1, precision, recall, matrices = nb.evaluate(1)
 
         print(f'F1        = {f1}')
         print(f'Precision = {precision}')
