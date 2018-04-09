@@ -2,6 +2,7 @@
 
 from Parser import Parser, DatasetPath
 from Headers import ActivityDataHeaders
+from sklearn.preprocessing import LabelEncoder
 import pandas as pd
 
 """
@@ -17,6 +18,7 @@ class QLearning:
     def __init__(self, p: Parser, number_of_activities: int):
         self.__p = p
         self.__n_activities = number_of_activities
+        self.__encoder = LabelEncoder()
 
     def algorithm(self):
         # First let's get what we want
@@ -31,9 +33,17 @@ class QLearning:
 
         activities_df = activities_df[activities_df[label].isin(n_most_frequent_activities)]
 
+        activities_df.sort_values(ActivityDataHeaders.START_TIME, inplace=True)
 
         # Build History
-        #history = {}
+        self.__encoder.fit(n_most_frequent_activities)
+        initial_state = (False,) * self.__n_activities
+        history = {
+            initial_state: initial_state
+        }
+
+
+
 
 if __name__ == '__main__':
     print('Q-Learning')
