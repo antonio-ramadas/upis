@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
-from DataProcessor import DataProcessor
-from Parser import DatasetPath
+from Parser import Parser, DatasetPath
+from Headers import ActivityDataHeaders
 import pandas as pd
 
 """
@@ -14,23 +14,34 @@ Retrieved from http://www.econf.info/files/105/1345/1092.pdf
 
 
 class QLearning:
-    def __init__(self, dp: DataProcessor):
-        self.__dp = dp
+    def __init__(self, p: Parser, number_of_activities: int):
+        self.__p = p
+        self.__n_activities = number_of_activities
 
-    def fit(self, train: pd.DataFrame):
-        # process data set
+    def algorithm(self):
+        # First let's get what we want
+        columns = [ActivityDataHeaders.LABEL,
+                   ActivityDataHeaders.START_TIME,
+                   ActivityDataHeaders.END_TIME]
+        activities_df = p.data()[columns]
 
-        # steps 1..7
+        label = ActivityDataHeaders.LABEL
 
-        pass
+        n_most_frequent_activities = activities_df[label].value_counts().index[:self.__n_activities]
 
+        activities_df = activities_df[activities_df[label].isin(n_most_frequent_activities)]
+
+
+        # Build History
+        #history = {}
 
 if __name__ == '__main__':
     print('Q-Learning')
 
     path = DatasetPath.MIT1
 
-    dp = DataProcessor(path=path)
+    p = Parser(path)
 
-    ql = QLearning(dp)
-    ql.fit(dp.data_processed)
+    ql = QLearning(p, 3)
+
+    ql.algorithm()
