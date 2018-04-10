@@ -69,14 +69,40 @@ class QLearning:
             if initial_state not in self.__history_graph:
                 self.__history_graph[initial_state] = initial_transtions
 
+    def __pattern_match(self, recent_activities: list) -> int:
+        length = 0
+
+        recent_activities = reversed(recent_activities)
+        old_state = None
+
+        for new_state in recent_activities:
+            if old_state is None:
+                if new_state not in self.__history_graph:
+                    return length
+
+                old_state = new_state
+                continue
+
+            activity = 0
+            for i in range(len(new_state)):
+                if old_state[i] != new_state[i]:
+                    break
+                activity += 1
+
+            if new_state in self.__history_graph and self.__history_graph[new_state][activity]:
+                length += 1
+                old_state = new_state
+            else:
+                return length
+
+        return length
+
     def algorithm(self, alpha: float = 0.5):
         assert 0 <= alpha <= 1
 
         activities_df = self.__process(self.__parser.data())
 
         self.__build_graph(activities_df)
-
-        print(self.__history_graph)
 
         number_of_activities = len(activities_df[ActivityDataHeaders.LABEL].unique())
 
@@ -85,18 +111,21 @@ class QLearning:
         recent_graph = {
             recent_state: [0] * number_of_activities
         }
+        recent_activities = [recent_state]
 
         for index, row in activities_df.iterrows():
             selected_activity = 0
             highest_ranking = -1
 
-            activities_sum = sum(recent_graph[recent_state])
+            # To prevent division by zero
+            activities_sum = max(1, sum(recent_graph[recent_state]))
 
             for activity in range(number_of_activities):
-                # TODO Add action to recent_graph
-                aux_recent_graph = recent_graph
+                new_state = list(recent_state)
+                new_state[activity] = not new_state[activity]
+                new_state = tuple(new_state)
 
-                l = self.__pattern_match(aux_recent_graph)
+                l = self.__pattern_match(recent_activities + [new_state])
                 r = q[recent_state][activity]
 
                 ranking = (1 - alpha) * l + alpha * (recent_graph[recent_state][activity] / activities_sum + r)
@@ -106,15 +135,18 @@ class QLearning:
                     selected_activity = activity
 
             # Update transition
-            recent_graph[recent_state][activity] += 1
+            recent_graph[recent_state][selected_activity] += 1
 
             # Go to new state
             recent_state = list(recent_state)
-            recent_state[activity] = not recent_state[activity]
+            recent_state[selected_activity] = not recent_state[selected_activity]
             recent_state = tuple(recent_state)
 
             if recent_state not in recent_graph:
                 recent_graph[recent_state] = [0] * number_of_activities
+
+            if len(recent_activities) == 0 or recent_state != recent_activities[-1]:
+                recent_activities += [recent_state]
 
             # TODO Update q
 
