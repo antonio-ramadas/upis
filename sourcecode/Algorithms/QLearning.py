@@ -15,11 +15,9 @@ Retrieved from http://www.econf.info/files/105/1345/1092.pdf
 
 
 class QLearning:
-    def __init__(self, p: Parser, number_of_activities: int):
-        self.__p = p
-        self.__n_activities = number_of_activities
+    def __init__(self, parser: Parser):
+        self.__parser = parser
         self.__encoder = LabelEncoder()
-        self.n_most_frequent_activities = []
 
     def __process(self, dataset: pd.DataFrame) -> pd.DataFrame:
         # First let's get what we want
@@ -30,14 +28,9 @@ class QLearning:
 
         label = ActivityDataHeaders.LABEL
 
-        # Get the most frequent activities
-        self.n_most_frequent_activities = activities_df[label].value_counts().index[:self.__n_activities]
-
-        activities_df = activities_df[activities_df[label].isin(self.n_most_frequent_activities)]
-
         starts = activities_df[[label, ActivityDataHeaders.START_TIME]]
         ends   = activities_df[[label, ActivityDataHeaders.END_TIME]]
-        ends.rename(index=str, columns={ActivityDataHeaders.END_TIME: ActivityDataHeaders.START_TIME}, inplace=True)
+        ends = ends.rename(index=str, columns={ActivityDataHeaders.END_TIME: ActivityDataHeaders.START_TIME})
 
         activities_df = starts.append(ends)
 
@@ -47,24 +40,49 @@ class QLearning:
 
         return activities_df
 
-    def algorithm(self):
-        activities_df = self.__process(p.data())
+    def __build_graph(self, activities_df: pd.DataFrame) -> dict:
+        # Encode the activities so they can act as index
+        self.__encoder.fit(activities_df[ActivityDataHeaders.LABEL].unique())
 
-        # Build History
-        self.__encoder.fit(self.n_most_frequent_activities)
-        initial_state = (False,) * self.__n_activities
+        initial_state      = (False,) * len(self.__encoder.classes_)
+        initial_transtions = [False ] * len(self.__encoder.classes_)
+
         history = {
-            initial_state: initial_state
+            initial_state: initial_transtions
         }
+
+        for index, row in activities_df.iterrows():
+            activity_idx = self.__encoder.transform([row[ActivityDataHeaders.LABEL]])[0]
+
+            # Update transition
+            transitions = history[initial_state]
+            transitions[activity_idx] = True
+            history[initial_state] = transitions
+
+            # Go to new state
+            initial_state = list(initial_state)
+            initial_state[activity_idx] = not initial_state[activity_idx]
+            initial_state = tuple(initial_state)
+
+            if initial_state not in history:
+                history[initial_state] = initial_transtions
+
+        return history
+
+    def algorithm(self):
+        activities_df = self.__process(self.__parser.data())
+
+        history = self.__build_graph(activities_df)
 
 
 if __name__ == '__main__':
     print('Q-Learning')
 
-    path = DatasetPath.MIT1
+    # MIT1 has not overlapping activities
+    path = DatasetPath.MIT2
 
     p = Parser(path)
 
-    ql = QLearning(p, 3)
+    ql = QLearning(p)
 
     ql.algorithm()
