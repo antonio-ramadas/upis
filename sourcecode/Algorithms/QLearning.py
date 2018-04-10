@@ -18,6 +18,7 @@ class QLearning:
     def __init__(self, parser: Parser):
         self.__parser = parser
         self.__encoder = LabelEncoder()
+        self.__history_graph = {}
 
     def __process(self, dataset: pd.DataFrame) -> pd.DataFrame:
         # First let's get what we want
@@ -47,32 +48,77 @@ class QLearning:
         initial_state      = (False,) * len(self.__encoder.classes_)
         initial_transtions = [False ] * len(self.__encoder.classes_)
 
-        history = {
-            initial_state: initial_transtions
-        }
+        if self.__history_graph == {}:
+            self.__history_graph = {
+                initial_state: initial_transtions
+            }
 
         for index, row in activities_df.iterrows():
             activity_idx = self.__encoder.transform([row[ActivityDataHeaders.LABEL]])[0]
 
             # Update transition
-            transitions = history[initial_state]
+            transitions = self.__history_graph[initial_state]
             transitions[activity_idx] = True
-            history[initial_state] = transitions
+            self.__history_graph[initial_state] = transitions
 
             # Go to new state
             initial_state = list(initial_state)
             initial_state[activity_idx] = not initial_state[activity_idx]
             initial_state = tuple(initial_state)
 
-            if initial_state not in history:
-                history[initial_state] = initial_transtions
+            if initial_state not in self.__history_graph:
+                self.__history_graph[initial_state] = initial_transtions
 
-        return history
+    def algorithm(self, alpha: float = 0.5):
+        assert 0 <= alpha <= 1
 
-    def algorithm(self):
         activities_df = self.__process(self.__parser.data())
 
-        history = self.__build_graph(activities_df)
+        self.__build_graph(activities_df)
+
+        print(self.__history_graph)
+
+        number_of_activities = len(activities_df[ActivityDataHeaders.LABEL].unique())
+
+        q = dict.fromkeys(self.__history_graph, [0] * number_of_activities)
+        recent_state = (False,) * number_of_activities
+        recent_graph = {
+            recent_state: [0] * number_of_activities
+        }
+
+        for index, row in activities_df.iterrows():
+            selected_activity = 0
+            highest_ranking = -1
+
+            activities_sum = sum(recent_graph[recent_state])
+
+            for activity in range(number_of_activities):
+                # TODO Add action to recent_graph
+                aux_recent_graph = recent_graph
+
+                l = self.__pattern_match(aux_recent_graph)
+                r = q[recent_state][activity]
+
+                ranking = (1 - alpha) * l + alpha * (recent_graph[recent_state][activity] / activities_sum + r)
+
+                if ranking > highest_ranking:
+                    highest_ranking = ranking
+                    selected_activity = activity
+
+            # Update transition
+            recent_graph[recent_state][activity] += 1
+
+            # Go to new state
+            recent_state = list(recent_state)
+            recent_state[activity] = not recent_state[activity]
+            recent_state = tuple(recent_state)
+
+            if recent_state not in recent_graph:
+                recent_graph[recent_state] = [0] * number_of_activities
+
+            # TODO Update q
+
+            # TODO Not said on the paper, but I could add action to history
 
 
 if __name__ == '__main__':
