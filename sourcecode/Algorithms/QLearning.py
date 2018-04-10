@@ -137,6 +137,15 @@ class QLearning:
             # Update transition
             recent_graph[recent_state][selected_activity] += 1
 
+            # Update q before
+            positive_reward = 0.5
+            negative_reward = -0.5
+            discount_factor = 0.5
+            assert 0 <= discount_factor <= 1
+            is_same_activity = self.__encoder.transform([row[ActivityDataHeaders.LABEL]])[0] == selected_activity
+            reward = positive_reward if is_same_activity else negative_reward
+            previous_state = recent_state
+
             # Go to new state
             recent_state = list(recent_state)
             recent_state[selected_activity] = not recent_state[selected_activity]
@@ -148,9 +157,10 @@ class QLearning:
             if len(recent_activities) == 0 or recent_state != recent_activities[-1]:
                 recent_activities += [recent_state]
 
-            # TODO Update q
+            q[previous_state][selected_activity] = (1 - alpha) * q[previous_state][selected_activity]\
+                                                   + alpha * (reward + discount_factor * max(q[recent_state]))
 
-            # TODO Not said on the paper, but I could add action to history
+            # TODO Not said on the paper, but I could add the activities to history
 
 
 if __name__ == '__main__':
