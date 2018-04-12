@@ -242,7 +242,7 @@ class QLearning:
                 self.__q[previous_state][selected_activity] += self.__alpha * (
                         reward + self.__discount_factor * max(self.__q[recent_state]))
 
-            metric = Metrics(processed_dataset[ActivityDataHeaders.LABEL], np.array(prediction))
+            metric = Metrics(processed_dataset[ActivityDataHeaders.LABEL], pd.DataFrame(prediction))
 
             f1 += metric.f1()
             precision += metric.precision()
