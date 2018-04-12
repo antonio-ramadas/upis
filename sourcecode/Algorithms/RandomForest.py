@@ -10,7 +10,7 @@ import math
 
 
 class RandomForest:
-    def __init__(self, dp:DataProcessor):
+    def __init__(self, dp: DataProcessor):
         self.__dp = dp
 
         self.__rf = RandomForestClassifier()

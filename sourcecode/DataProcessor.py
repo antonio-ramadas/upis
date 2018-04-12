@@ -114,15 +114,13 @@ class DataProcessor:
 
         return self.data_processed
 
-    def split(self, n_folds=10):
+    def split(self, n_folds=10, time_of_the_action = SensorProcessedDataHeaders.START):
         """
         Generate of splits following specific conditions. The parameter n_splits is the number of folds. By default it
         is 10-fold.
          - 66% to training data and the rest to test data.
         :return: Generator of Pandas DataFrames that split data into training and test set
         """
-        time_of_the_action = SensorProcessedDataHeaders.START
-
         # The data is spread across 2 months, but in the same year (look at the Jupyter Notebook)
         days_of_the_year = self.data_processed[time_of_the_action].apply(lambda x: x.dayofyear)
         days_of_the_year = days_of_the_year.to_frame()

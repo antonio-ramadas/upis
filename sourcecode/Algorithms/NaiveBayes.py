@@ -149,7 +149,7 @@ if __name__ == '__main__':
 
         print(nb.predict(dp.process_sensors().iloc[[0]]))
 
-        f1, precision, recall, matrices = nb.evaluate(1)
+        f1, precision, recall, matrices = nb.evaluate()
 
         print(f'F1        = {f1}')
         print(f'Precision = {precision}')
