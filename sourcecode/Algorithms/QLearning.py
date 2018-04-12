@@ -150,15 +150,8 @@ class QLearning:
 
         return selected_activity
 
-    def fit(self, activities_df: pd.DataFrame):
-        """
-        Run the algorithm as described on the paper
-        """
-        #self.__number_of_activities = len(activities_df[ActivityDataHeaders.LABEL].unique())
-
-        activities_df = self.process_dataset(activities_df)
-
-        self.__build_history_graph(activities_df)
+    def __predict(self, activities_df):
+        prediction = np.empty((0, 0))
 
         # Initialize Q matrix
         self.__q = dict.fromkeys(self.__history_graph, [0] * self.__number_of_activities)
@@ -170,6 +163,8 @@ class QLearning:
 
         for index, row in activities_df.iterrows():
             selected_activity = self.__select_activity(recent_graph, recent_activities, recent_state)
+
+            prediction = np.append(prediction, self.__encoder.inverse_transform([selected_activity]))
 
             # Update transition
             recent_graph[recent_state][selected_activity] += 1
@@ -190,11 +185,23 @@ class QLearning:
             recent_activities += [recent_state]
 
             self.__q[previous_state][selected_activity] = \
-                                                        (1 - self.__alpha) * self.__q[previous_state][selected_activity]
+                (1 - self.__alpha) * self.__q[previous_state][selected_activity]
             self.__q[previous_state][selected_activity] += self.__alpha * (
-                                                        reward + self.__discount_factor * max(self.__q[recent_state]))
+                    reward + self.__discount_factor * max(self.__q[recent_state]))
 
             # Not said on the paper, but I could add the activities to history
+
+        return prediction
+
+    def fit(self, activities_df: pd.DataFrame):
+        """
+        Run the algorithm as described on the paper
+        """
+        activities_df = self.process_dataset(activities_df)
+
+        self.__build_history_graph(activities_df)
+
+        self.__predict(activities_df)
 
     def evaluate(self, n_folds=10):
         matrices = []
@@ -205,44 +212,11 @@ class QLearning:
         for train, test in self.__dp.split(n_folds, ActivityDataHeaders.START_TIME):
             self.fit(train)
 
-            prediction = np.empty((0,0))
-            recent_state = (False,) * self.__number_of_activities
-            recent_graph = {
-                recent_state: [1] * self.__number_of_activities
-            }
-            recent_activities = [recent_state]
-
             processed_dataset = self.process_dataset(test)
 
-            for index, row in processed_dataset.iterrows():
-                selected_activity = self.__select_activity(recent_graph, recent_activities, recent_state)
+            predictions = self.__predict(processed_dataset)
 
-                prediction = np.append(prediction, self.__encoder.inverse_transform([selected_activity]))
-
-                # Update transition
-                recent_graph[recent_state][selected_activity] += 1
-
-                # Update q before
-                is_same_activity = self.__encoder.transform([row[ActivityDataHeaders.LABEL]])[0] == selected_activity
-                reward = self.__positive_reward if is_same_activity else self.__negative_reward
-                previous_state = recent_state
-
-                # Go to new state
-                recent_state = list(recent_state)
-                recent_state[selected_activity] = not recent_state[selected_activity]
-                recent_state = tuple(recent_state)
-
-                if recent_state not in recent_graph:
-                    recent_graph[recent_state] = [1] * self.__number_of_activities
-
-                recent_activities += [recent_state]
-
-                self.__q[previous_state][selected_activity] = \
-                    (1 - self.__alpha) * self.__q[previous_state][selected_activity]
-                self.__q[previous_state][selected_activity] += self.__alpha * (
-                        reward + self.__discount_factor * max(self.__q[recent_state]))
-
-            metric = Metrics(processed_dataset[ActivityDataHeaders.LABEL], pd.DataFrame(prediction))
+            metric = Metrics(processed_dataset[ActivityDataHeaders.LABEL], pd.DataFrame(predictions))
 
             f1 += metric.f1()
             precision += metric.precision()
