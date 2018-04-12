@@ -1,6 +1,6 @@
 #!/usr/bin/python3
-
 from Parser import Parser, DatasetPath
+from DataProcessor import DataProcessor
 from Headers import ActivityDataHeaders
 from sklearn.preprocessing import LabelEncoder
 import pandas as pd
@@ -15,51 +15,81 @@ Retrieved from http://www.econf.info/files/105/1345/1092.pdf
 
 
 class QLearning:
-    def __init__(self, parser: Parser):
-        self.__parser = parser
+    def __init__(self, dp: DataProcessor, alpha: float = 0.5, positive_reward: float = 0.5,
+                 negative_reward: float = -0.5, discount_factor: float = 0.5):
+        assert 0 <= alpha <= 1
+        assert 0 <= discount_factor <= 1
+
+        self.__dp = dp
+        self.__data_processed = None
         self.__encoder = LabelEncoder()
         self.__history_graph = {}
+        self.__q = {}
+        self.__alpha = alpha
+        self.__positive_reward = positive_reward
+        self.__negative_reward = negative_reward
+        self.__discount_factor = discount_factor
+        self.__number_of_activities = len(dp.data_processed[ActivityDataHeaders.LABEL].unique())
 
-    def __process(self, dataset: pd.DataFrame) -> pd.DataFrame:
-        # First let's get what we want
+    @property
+    def data_processed(self):
+        if self.__data_processed is None:
+            self.__process_dataset()
+
+        return self.__data_processed
+
+    @data_processed.setter
+    def data_processed(self, value):
+        self.__data_processed = value
+
+    def __process_dataset(self) -> pd.DataFrame:
+        """
+        Process the dataset into 2 columns: Label and Time it occurred. The dataset as given has 3 columns (Label, Start
+        and End). The return is the dataset sorted by time. So the length of an activity is the time between two
+        consecutive occurrences. When an activity first shows, then it started. When it shows again, then it ended. Just
+        loop between these two states while you traverse the dataset and it is possible to point out the exact state of
+        the entire house in any point of time.
+
+        :return: Sorted dataset, by time, with two columns (Label and Time)
+        """
         columns = [ActivityDataHeaders.LABEL,
                    ActivityDataHeaders.START_TIME,
                    ActivityDataHeaders.END_TIME]
-        activities_df = dataset[columns]
+        activities_df = self.__dp.data_processed[columns]
 
         label = ActivityDataHeaders.LABEL
 
         starts = activities_df[[label, ActivityDataHeaders.START_TIME]]
-        ends   = activities_df[[label, ActivityDataHeaders.END_TIME]]
+        ends = activities_df[[label, ActivityDataHeaders.END_TIME]]
+
         ends = ends.rename(index=str, columns={ActivityDataHeaders.END_TIME: ActivityDataHeaders.START_TIME})
 
-        activities_df = starts.append(ends)
+        self.data_processed = starts.append(ends)
 
-        # By sorting, when an activity first shows, then it starts, if it shows again, then it is its end
-        # We can read now this as a loop
-        activities_df.sort_values(ActivityDataHeaders.START_TIME, inplace=True)
+        # By sorting, when an activity first shows, then it starts, and when it shows again, then it is its end
+        self.data_processed.sort_values(ActivityDataHeaders.START_TIME, inplace=True)
 
-        return activities_df
+    def __build_history_graph(self, activities_df: pd.DataFrame):
+        """
+        Builds the history graph as detailed on the paper. The graph is written to the object variable
 
-    def __build_graph(self, activities_df: pd.DataFrame) -> dict:
+        :param activities_df: Dataset processed
+        """
         # Encode the activities so they can act as index
         self.__encoder.fit(activities_df[ActivityDataHeaders.LABEL].unique())
 
-        initial_state      = (False,) * len(self.__encoder.classes_)
-        initial_transtions = [False ] * len(self.__encoder.classes_)
+        initial_state = (False,) * len(self.__encoder.classes_)
+        initial_transitions = [False] * len(self.__encoder.classes_)
 
-        if self.__history_graph == {}:
-            self.__history_graph = {
-                initial_state: initial_transtions
-            }
+        self.__history_graph = {
+            initial_state: initial_transitions
+        }
 
         for index, row in activities_df.iterrows():
             activity_idx = self.__encoder.transform([row[ActivityDataHeaders.LABEL]])[0]
 
             # Update transition
-            transitions = self.__history_graph[initial_state]
-            transitions[activity_idx] = True
-            self.__history_graph[initial_state] = transitions
+            self.__history_graph[initial_state][activity_idx] = True
 
             # Go to new state
             initial_state = list(initial_state)
@@ -67,11 +97,18 @@ class QLearning:
             initial_state = tuple(initial_state)
 
             if initial_state not in self.__history_graph:
-                self.__history_graph[initial_state] = initial_transtions
+                self.__history_graph[initial_state] = initial_transitions
 
     def __pattern_match(self, recent_activities: list) -> int:
+        """
+        Perform the pattern match as described on the paper
+
+        :param recent_activities: List of the most recent activities (check recent graph description on the paper)
+        :return: Length of the pattern match
+        """
         length = 0
 
+        # As said on the paper, look backwards
         recent_activities = reversed(recent_activities)
         old_state = None
 
@@ -83,11 +120,9 @@ class QLearning:
                 old_state = new_state
                 continue
 
-            activity = 0
-            for i in range(len(new_state)):
-                if old_state[i] != new_state[i]:
+            for activity in range(len(new_state)):
+                if old_state[activity] != new_state[activity]:
                     break
-                activity += 1
 
             if new_state in self.__history_graph and self.__history_graph[new_state][activity]:
                 length += 1
@@ -97,53 +132,58 @@ class QLearning:
 
         return length
 
-    def algorithm(self, alpha: float = 0.5):
-        assert 0 <= alpha <= 1
+    def __select_activity(self, recent_graph: dict, recent_activities: list, recent_state: tuple):
+        """
+        Select the activity according to the formula of the paper
+        """
+        selected_activity = 0
+        highest_ranking = -1
 
-        activities_df = self.__process(self.__parser.data())
+        activities_sum = sum(recent_graph[recent_state])
 
-        self.__build_graph(activities_df)
+        for activity in range(self.__number_of_activities):
+            new_state = list(recent_state)
+            new_state[activity] = not new_state[activity]
+            new_state = tuple(new_state)
 
-        number_of_activities = len(activities_df[ActivityDataHeaders.LABEL].unique())
+            l = self.__pattern_match(recent_activities + [new_state])
+            r = self.__q[recent_state][activity]
 
-        q = dict.fromkeys(self.__history_graph, [0] * number_of_activities)
-        recent_state = (False,) * number_of_activities
+            # Following the formula from the paper
+            ranking = (1 - self.__alpha) * l
+            ranking += self.__alpha * (recent_graph[recent_state][activity] / activities_sum + r)
+
+            if ranking > highest_ranking:
+                highest_ranking = ranking
+                selected_activity = activity
+
+        return selected_activity
+
+    def fit(self, activities_df: pd.DataFrame):
+        """
+        Run the algorithm as described on the paper
+
+        :param activities_df: Dataset, but must already be processed
+        """
+        self.__build_history_graph(activities_df)
+
+        # Initialize Q matrix
+        self.__q = dict.fromkeys(self.__history_graph, [0] * self.__number_of_activities)
+        recent_state = (False,) * self.__number_of_activities
         recent_graph = {
-            recent_state: [0] * number_of_activities
+            recent_state: [1] * self.__number_of_activities
         }
         recent_activities = [recent_state]
 
         for index, row in activities_df.iterrows():
-            selected_activity = 0
-            highest_ranking = -1
-
-            # To prevent division by zero
-            activities_sum = max(1, sum(recent_graph[recent_state]))
-
-            for activity in range(number_of_activities):
-                new_state = list(recent_state)
-                new_state[activity] = not new_state[activity]
-                new_state = tuple(new_state)
-
-                l = self.__pattern_match(recent_activities + [new_state])
-                r = q[recent_state][activity]
-
-                ranking = (1 - alpha) * l + alpha * (recent_graph[recent_state][activity] / activities_sum + r)
-
-                if ranking > highest_ranking:
-                    highest_ranking = ranking
-                    selected_activity = activity
+            selected_activity = self.__select_activity(recent_graph, recent_activities, recent_state)
 
             # Update transition
             recent_graph[recent_state][selected_activity] += 1
 
             # Update q before
-            positive_reward = 0.5
-            negative_reward = -0.5
-            discount_factor = 0.5
-            assert 0 <= discount_factor <= 1
             is_same_activity = self.__encoder.transform([row[ActivityDataHeaders.LABEL]])[0] == selected_activity
-            reward = positive_reward if is_same_activity else negative_reward
+            reward = self.__positive_reward if is_same_activity else self.__negative_reward
             previous_state = recent_state
 
             # Go to new state
@@ -152,15 +192,16 @@ class QLearning:
             recent_state = tuple(recent_state)
 
             if recent_state not in recent_graph:
-                recent_graph[recent_state] = [0] * number_of_activities
+                recent_graph[recent_state] = [1] * self.__number_of_activities
 
-            if len(recent_activities) == 0 or recent_state != recent_activities[-1]:
-                recent_activities += [recent_state]
+            recent_activities += [recent_state]
 
-            q[previous_state][selected_activity] = (1 - alpha) * q[previous_state][selected_activity]\
-                                                   + alpha * (reward + discount_factor * max(q[recent_state]))
+            self.__q[previous_state][selected_activity] = \
+                                                        (1 - self.__alpha) * self.__q[previous_state][selected_activity]
+            self.__q[previous_state][selected_activity] += self.__alpha * (
+                                                        reward + self.__discount_factor * max(self.__q[recent_state]))
 
-            # TODO Not said on the paper, but I could add the activities to history
+            # Not said on the paper, but I could add the activities to history
 
 
 if __name__ == '__main__':
@@ -169,8 +210,10 @@ if __name__ == '__main__':
     # MIT1 has not overlapping activities
     path = DatasetPath.MIT2
 
-    p = Parser(path)
+    dp = DataProcessor(path=path)
 
-    ql = QLearning(p)
+    dp.data_processed = Parser().data()
 
-    ql.algorithm()
+    ql = QLearning(dp)
+
+    ql.fit(ql.data_processed)
