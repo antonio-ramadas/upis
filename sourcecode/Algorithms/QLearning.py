@@ -2,8 +2,10 @@
 from Parser import Parser, DatasetPath
 from DataProcessor import DataProcessor
 from Headers import ActivityDataHeaders
+from Metrics import Metrics
 from sklearn.preprocessing import LabelEncoder
 import pandas as pd
+import numpy as np
 
 """
 Algorithm from:
@@ -21,7 +23,6 @@ class QLearning:
         assert 0 <= discount_factor <= 1
 
         self.__dp = dp
-        self.__data_processed = None
         self.__encoder = LabelEncoder()
         self.__history_graph = {}
         self.__q = {}
@@ -31,18 +32,10 @@ class QLearning:
         self.__discount_factor = discount_factor
         self.__number_of_activities = len(dp.data_processed[ActivityDataHeaders.LABEL].unique())
 
-    @property
-    def data_processed(self):
-        if self.__data_processed is None:
-            self.__process_dataset()
+        # Encode the activities so they can act as index
+        self.__encoder.fit(dp.data_processed[ActivityDataHeaders.LABEL].unique())
 
-        return self.__data_processed
-
-    @data_processed.setter
-    def data_processed(self, value):
-        self.__data_processed = value
-
-    def __process_dataset(self) -> pd.DataFrame:
+    def process_dataset(self, activities_df) -> pd.DataFrame:
         """
         Process the dataset into 2 columns: Label and Time it occurred. The dataset as given has 3 columns (Label, Start
         and End). The return is the dataset sorted by time. So the length of an activity is the time between two
@@ -55,7 +48,6 @@ class QLearning:
         columns = [ActivityDataHeaders.LABEL,
                    ActivityDataHeaders.START_TIME,
                    ActivityDataHeaders.END_TIME]
-        activities_df = self.__dp.data_processed[columns]
 
         label = ActivityDataHeaders.LABEL
 
@@ -64,10 +56,12 @@ class QLearning:
 
         ends = ends.rename(index=str, columns={ActivityDataHeaders.END_TIME: ActivityDataHeaders.START_TIME})
 
-        self.data_processed = starts.append(ends)
+        activities_df = starts.append(ends)
 
         # By sorting, when an activity first shows, then it starts, and when it shows again, then it is its end
-        self.data_processed.sort_values(ActivityDataHeaders.START_TIME, inplace=True)
+        activities_df.sort_values(ActivityDataHeaders.START_TIME, inplace=True)
+
+        return activities_df
 
     def __build_history_graph(self, activities_df: pd.DataFrame):
         """
@@ -75,11 +69,8 @@ class QLearning:
 
         :param activities_df: Dataset processed
         """
-        # Encode the activities so they can act as index
-        self.__encoder.fit(activities_df[ActivityDataHeaders.LABEL].unique())
-
-        initial_state = (False,) * len(self.__encoder.classes_)
-        initial_transitions = [False] * len(self.__encoder.classes_)
+        initial_state = (False,) * self.__number_of_activities
+        initial_transitions = [False] * self.__number_of_activities
 
         self.__history_graph = {
             initial_state: initial_transitions
@@ -162,9 +153,11 @@ class QLearning:
     def fit(self, activities_df: pd.DataFrame):
         """
         Run the algorithm as described on the paper
-
-        :param activities_df: Dataset, but must already be processed
         """
+        #self.__number_of_activities = len(activities_df[ActivityDataHeaders.LABEL].unique())
+
+        activities_df = self.process_dataset(activities_df)
+
         self.__build_history_graph(activities_df)
 
         # Initialize Q matrix
@@ -203,6 +196,66 @@ class QLearning:
 
             # Not said on the paper, but I could add the activities to history
 
+    def evaluate(self, n_folds=10):
+        matrices = []
+        f1 = 0
+        precision = 0
+        recall = 0
+
+        for train, test in self.__dp.split(n_folds, ActivityDataHeaders.START_TIME):
+            self.fit(train)
+
+            prediction = np.empty((0,0))
+            recent_state = (False,) * self.__number_of_activities
+            recent_graph = {
+                recent_state: [1] * self.__number_of_activities
+            }
+            recent_activities = [recent_state]
+
+            processed_dataset = self.process_dataset(test)
+
+            for index, row in processed_dataset.iterrows():
+                selected_activity = self.__select_activity(recent_graph, recent_activities, recent_state)
+
+                prediction = np.append(prediction, self.__encoder.inverse_transform([selected_activity]))
+
+                # Update transition
+                recent_graph[recent_state][selected_activity] += 1
+
+                # Update q before
+                is_same_activity = self.__encoder.transform([row[ActivityDataHeaders.LABEL]])[0] == selected_activity
+                reward = self.__positive_reward if is_same_activity else self.__negative_reward
+                previous_state = recent_state
+
+                # Go to new state
+                recent_state = list(recent_state)
+                recent_state[selected_activity] = not recent_state[selected_activity]
+                recent_state = tuple(recent_state)
+
+                if recent_state not in recent_graph:
+                    recent_graph[recent_state] = [1] * self.__number_of_activities
+
+                recent_activities += [recent_state]
+
+                self.__q[previous_state][selected_activity] = \
+                    (1 - self.__alpha) * self.__q[previous_state][selected_activity]
+                self.__q[previous_state][selected_activity] += self.__alpha * (
+                        reward + self.__discount_factor * max(self.__q[recent_state]))
+
+            metric = Metrics(processed_dataset[ActivityDataHeaders.LABEL], np.array(prediction))
+
+            f1 += metric.f1()
+            precision += metric.precision()
+            recall += metric.recall()
+            matrices += [metric.confusion_matrix()]
+
+        f1 /= n_folds
+        precision /= n_folds
+        recall /= n_folds
+        matrices = np.array(matrices)
+
+        return f1, precision, recall, matrices
+
 
 if __name__ == '__main__':
     print('Q-Learning')
@@ -216,4 +269,10 @@ if __name__ == '__main__':
 
     ql = QLearning(dp)
 
-    ql.fit(ql.data_processed)
+    ql.fit(dp.data_processed)
+
+    f1, precision, recall, matrices = ql.evaluate()
+
+    print(f'F1        = {f1}')
+    print(f'Precision = {precision}')
+    print(f'Recall    = {recall}')
