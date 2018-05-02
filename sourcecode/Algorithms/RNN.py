@@ -8,6 +8,8 @@ from keras.layers import Dense
 from keras.models import Sequential
 from keras.optimizers import RMSprop
 from keras.callbacks import TensorBoard, EarlyStopping
+from keras.callbacks import History
+from keras.models import load_model
 import datetime
 import time
 import pandas as pd
@@ -32,6 +34,13 @@ class RNN:
         # Encode the activities so they can act as index
         self.__encoder.fit(dp.data_processed[ActivityDataHeaders.LABEL].unique())
 
+        file_name = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
+
+        file_name += " {}neu-{}lay-{}epo-{}-{}drop-{}lag-{}".format(self.__neurons,self.__n_layers,self.__n_epochs,
+                                                                    self.__activation, self.__dropout, self.__lag,
+                                                                    'LSTM' if self.__rnn_layer is LSTM else 'GRU')
+        self.__file_name = file_name
+
     def __create_model(self):
         model = Sequential()
 
@@ -55,7 +64,7 @@ class RNN:
         model.add(Dense(1))
 
         # For now, let's not pass any further parameters
-        model.compile(loss='mean_squared_error', optimizer=RMSprop(lr=0.001))
+        model.compile(loss='mean_squared_error', optimizer=RMSprop(lr=0.001), metrics=['accuracy'])
 
         return model
 
@@ -87,7 +96,7 @@ class RNN:
 
         return activities_df
 
-    def __create_batches(self, data:pd.DataFrame):
+    def __create_batches(self, data:pd.DataFrame = None):
         if data is None:
             data = self.__dp.data_processed
 
@@ -135,7 +144,13 @@ class RNN:
 
         return x, y
 
-    def fit(self, data: pd.DataFrame = None):
+    def load_model(self, file: str):
+        self.__model = load_model("models/{}.h5".format(file))
+
+    def save_model(self):
+        self.__model.save("models/{}.h5".format(self.__file_name))
+
+    def fit(self, data: pd.DataFrame = None) -> History:
         if data is None:
             data = self.__dp.data_processed
 
@@ -150,21 +165,41 @@ class RNN:
         train_x, train_y = self.__flat(train_batches)
         validation_x, validation_y = self.__flat(validation_batches)
 
-        file_time = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
+        tensorboard = TensorBoard(log_dir="logs/{}".format(self.__file_name))
 
-        file_time += " {}neu-{}lay-{}epo-{}-{}drop-{}lag-{}".format(self.__neurons,self.__n_layers,self.__n_epochs,
-                                                                       self.__activation, self.__dropout, self.__lag,
-                                                                       'LSTM' if self.__rnn_layer is LSTM else 'GRU')
+        eayly_stopping = EarlyStopping(min_delta=1e-10, patience=25)
 
-        tensorboard = TensorBoard(log_dir="logs/{}".format(file_time))
+        history = self.__model.fit(x=train_x, y=train_y, validation_data=(validation_x,validation_y),
+                                epochs=self.__n_epochs, shuffle=False, verbose=2, batch_size=None,
+                                callbacks=[tensorboard, eayly_stopping])
 
-        eayly_stopping = EarlyStopping(min_delta=10**-10, patience=25)
-
-        self.__model.fit(x=train_x, y=train_y, validation_data=(validation_x,validation_y), epochs=self.__n_epochs,
-                         shuffle=False, verbose=2, batch_size=None, callbacks=[tensorboard, eayly_stopping])
+        return history
 
     def predict(self, x):
-        pass
+        batches = self.__create_batches(x)
+
+        x, _ = self.__flat(batches)
+
+        predictions = self.__model.predict(x)
+
+        # Cast to int
+        predictions = predictions.astype(int)
+
+        n_classes = len(self.__encoder.classes_)
+
+        new_predictions = np.empty((0,1))
+
+        # This loop is because inverse_transform of Label Encoder throws an error if the number was never seen
+        # https://github.com/scikit-learn/scikit-learn/issues/10552
+        # This is just an workaround
+        for idx in range(predictions.shape[0]):
+            elem = predictions[idx]
+
+            label = self.__encoder.inverse_transform(elem)[0] if 0 <= elem[0] < n_classes else ''
+
+            new_predictions = np.vstack((new_predictions, label))
+
+        return new_predictions
 
     def evaluate(self, n_folds=10):
         return None, None, None, None
@@ -179,9 +214,11 @@ if __name__ == '__main__':
 
     dp.data_processed = Parser().data()
 
-    rnn = RNN(dp, neurons=16, n_layers=3, dropout=0.5)
+    rnn = RNN(dp, neurons=16, n_layers=3, dropout=0.5, n_epochs=1)
 
     rnn.fit()
+
+    predictions = rnn.predict(dp.data_processed)
 
     f1, precision, recall, matrices = rnn.evaluate()
 
