@@ -7,7 +7,7 @@ from keras.layers.recurrent import LSTM, GRU
 from keras.layers import Dense
 from keras.models import Sequential
 from keras.optimizers import RMSprop
-from keras.callbacks import TensorBoard
+from keras.callbacks import TensorBoard, EarlyStopping
 import datetime
 import time
 import pandas as pd
@@ -152,10 +152,16 @@ class RNN:
 
         file_time = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
 
+        file_time += " {}neu-{}lay-{}epo-{}-{}drop-{}lag-{}".format(self.__neurons,self.__n_layers,self.__n_epochs,
+                                                                       self.__activation, self.__dropout, self.__lag,
+                                                                       'LSTM' if self.__rnn_layer is LSTM else 'GRU')
+
         tensorboard = TensorBoard(log_dir="logs/{}".format(file_time))
 
+        eayly_stopping = EarlyStopping(min_delta=10**-10, patience=25)
+
         self.__model.fit(x=train_x, y=train_y, validation_data=(validation_x,validation_y), epochs=self.__n_epochs,
-                         shuffle=False, verbose=2, batch_size=None, callbacks=[tensorboard])
+                         shuffle=False, verbose=2, batch_size=None, callbacks=[tensorboard, eayly_stopping])
 
     def predict(self, x):
         pass
@@ -173,7 +179,7 @@ if __name__ == '__main__':
 
     dp.data_processed = Parser().data()
 
-    rnn = RNN(dp)
+    rnn = RNN(dp, neurons=16, n_layers=3, dropout=0.5)
 
     rnn.fit()
 
