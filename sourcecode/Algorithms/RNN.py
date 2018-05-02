@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 from sklearn.preprocessing import LabelEncoder
-
 from Headers import ActivityDataHeaders
 from Parser import Parser, DatasetPath
 from DataProcessor import DataProcessor
@@ -8,9 +7,11 @@ from keras.layers.recurrent import LSTM, GRU
 from keras.layers import Dense
 from keras.models import Sequential
 from keras.optimizers import RMSprop
+from keras.callbacks import TensorBoard
+import datetime
+import time
 import pandas as pd
 import numpy as np
-
 
 class RNN:
     def __init__(self, dp: DataProcessor, activation="tanh", activation_r="hard_sigmoid", lag=5, neurons=512,
@@ -149,8 +150,12 @@ class RNN:
         train_x, train_y = self.__flat(train_batches)
         validation_x, validation_y = self.__flat(validation_batches)
 
+        file_time = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
+
+        tensorboard = TensorBoard(log_dir="logs/{}".format(file_time))
+
         self.__model.fit(x=train_x, y=train_y, validation_data=(validation_x,validation_y), epochs=self.__n_epochs,
-                         shuffle=True, verbose=2, batch_size=None)
+                         shuffle=False, verbose=2, batch_size=None, callbacks=[tensorboard])
 
     def predict(self, x):
         pass
