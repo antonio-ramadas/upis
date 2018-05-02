@@ -1,6 +1,9 @@
 #!/usr/bin/python3
+from random import random
+
 from sklearn.preprocessing import LabelEncoder
 from Headers import ActivityDataHeaders
+from Metrics import Metrics
 from Parser import Parser, DatasetPath
 from DataProcessor import DataProcessor
 from keras.layers.recurrent import LSTM, GRU
@@ -150,7 +153,7 @@ class RNN:
     def save_model(self):
         self.__model.save("models/{}.h5".format(self.__file_name))
 
-    def fit(self, data: pd.DataFrame = None) -> History:
+    def fit(self, data: pd.DataFrame = None, to_save=True) -> History:
         if data is None:
             data = self.__dp.data_processed
 
@@ -165,13 +168,16 @@ class RNN:
         train_x, train_y = self.__flat(train_batches)
         validation_x, validation_y = self.__flat(validation_batches)
 
-        tensorboard = TensorBoard(log_dir="logs/{}".format(self.__file_name))
+        cbacks = []
 
-        eayly_stopping = EarlyStopping(min_delta=1e-10, patience=25)
+        if to_save:
+            cbacks.append(TensorBoard(log_dir="logs/{} {}".format(self.__file_name, random())))
+
+        cbacks.append(EarlyStopping(min_delta=1e-10, patience=25))
 
         history = self.__model.fit(x=train_x, y=train_y, validation_data=(validation_x,validation_y),
                                 epochs=self.__n_epochs, shuffle=False, verbose=2, batch_size=None,
-                                callbacks=[tensorboard, eayly_stopping])
+                                callbacks=cbacks)
 
         return history
 
@@ -187,7 +193,7 @@ class RNN:
 
         n_classes = len(self.__encoder.classes_)
 
-        new_predictions = np.empty((0,1))
+        new_predictions = np.empty(0)
 
         # This loop is because inverse_transform of Label Encoder throws an error if the number was never seen
         # https://github.com/scikit-learn/scikit-learn/issues/10552
@@ -197,12 +203,36 @@ class RNN:
 
             label = self.__encoder.inverse_transform(elem)[0] if 0 <= elem[0] < n_classes else ''
 
-            new_predictions = np.vstack((new_predictions, label))
+            new_predictions = np.hstack((new_predictions, label))
 
         return new_predictions
 
     def evaluate(self, n_folds=10):
-        return None, None, None, None
+        matrices = []
+        f1 = 0
+        precision = 0
+        recall = 0
+
+        for train, test in self.__dp.split(n_folds, ActivityDataHeaders.START_TIME):
+            self.fit(train, to_save=False)
+
+            truth = test[ActivityDataHeaders.LABEL]
+
+            prediction = self.predict(test)
+
+            metric = Metrics(truth, pd.DataFrame(prediction))
+
+            f1 += metric.f1()
+            precision += metric.precision()
+            recall += metric.recall()
+            matrices += [metric.confusion_matrix()]
+
+        f1 /= n_folds
+        precision /= n_folds
+        recall /= n_folds
+        matrices = np.array(matrices)
+
+        return f1, precision, recall, matrices
 
 
 if __name__ == '__main__':
