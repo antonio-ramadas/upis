@@ -10,13 +10,31 @@ from keras.layers.recurrent import LSTM, GRU
 from keras.layers import Dense
 from keras.models import Sequential
 from keras.optimizers import RMSprop
-from keras.callbacks import TensorBoard, EarlyStopping
-from keras.callbacks import History
+from keras.callbacks import TensorBoard, EarlyStopping, History, Callback
 from keras.models import load_model
 import datetime
 import time
 import pandas as pd
 import numpy as np
+
+
+class Resetter(Callback):
+    def __init__(self, batches):
+        super(Resetter, self).__init__()
+        self.__sample_idx = 0
+        self.__batch_idx = 0
+        self.__batches = batches
+
+    def on_batch_end(self, batch, logs=None):
+        self.__sample_idx += 1
+        if self.__sample_idx >= self.__batches[self.__batch_idx].shape[0]:
+            self.__sample_idx = 0
+            self.__batch_idx += 1
+            self.__batch_idx %= len(self.__batches)
+
+            self.model.reset_states()
+        return
+
 
 class RNN:
     def __init__(self, dp: DataProcessor, activation="tanh", activation_r="hard_sigmoid", lag=5, neurons=512,
@@ -50,18 +68,20 @@ class RNN:
         input_shape = (self.__lag, 1)
 
         if self.__n_layers == 1:
-            model.add(self.__rnn_layer(self.__neurons, input_shape=input_shape,
+            model.add(self.__rnn_layer(self.__neurons, input_shape=input_shape, stateful=True,
+                                       batch_input_shape=(1,self.__lag,1),
                                        recurrent_dropout=self.__dropout, activation=self.__activation,
                                        recurrent_activation=self.__activation_r))
         else:
-            model.add(self.__rnn_layer(self.__neurons, input_shape=input_shape,
+            model.add(self.__rnn_layer(self.__neurons, input_shape=input_shape, stateful=True,
+                                       batch_input_shape=(1,self.__lag,1),
                                        recurrent_dropout=self.__dropout, activation=self.__activation,
                                        recurrent_activation=self.__activation_r, return_sequences=True))
             for i in range(1, self.__n_layers - 1):
-                model.add(self.__rnn_layer(self.__neurons, recurrent_dropout=self.__dropout,
+                model.add(self.__rnn_layer(self.__neurons, recurrent_dropout=self.__dropout, stateful=True,
                                            activation=self.__activation, recurrent_activation=self.__activation_r,
                                            return_sequences=True))
-            model.add(self.__rnn_layer(self.__neurons, recurrent_dropout=self.__dropout,
+            model.add(self.__rnn_layer(self.__neurons, recurrent_dropout=self.__dropout, stateful=True,
                                        activation=self.__activation, recurrent_activation=self.__activation_r))
 
         model.add(Dense(1))
@@ -164,6 +184,7 @@ class RNN:
         train_batches = batches[:-validation_size]
         validation_batches = batches[-validation_size:]
 
+        train_x, train_y = self.__flat(train_batches)
         validation_x, validation_y = self.__flat(validation_batches)
 
         cbacks = []
@@ -171,20 +192,11 @@ class RNN:
         if to_save:
             cbacks.append(TensorBoard(log_dir="logs/{} {}".format(self.__file_name, random())))
 
-        cbacks.append(EarlyStopping(min_delta=1e-10, patience=25))
+        cbacks.append(EarlyStopping(min_delta=1e-3, patience=25))
+        cbacks.append(Resetter(train_batches))
 
-        batch_idx = 0
-        for epoch in range(self.__n_epochs):
-            train_x, train_y = self.__flat(np.array([train_batches[batch_idx]]))
-            self.__model.fit(x=train_x, y=train_y, validation_data=(validation_x,validation_y), initial_epoch=epoch,
-                             epochs=epoch+1, shuffle=False, verbose=2, batch_size=None, callbacks=cbacks)
-
-            # self.__model.reset_states()
-
-            batch_idx += 1
-            batch_idx %= len(train_batches)
-
-        return self.__model.history
+        return self.__model.fit(x=train_x, y=train_y, validation_data=(validation_x,validation_y),
+                         epochs=self.__n_epochs, shuffle=False, verbose=2, batch_size=1, callbacks=cbacks)
 
     def predict(self, x):
         batches = self.__create_batches(x)
@@ -252,7 +264,7 @@ if __name__ == '__main__':
 
     dp.data_processed = Parser().data()
 
-    rnn = RNN(dp, lag=5, neurons=8, n_layers=2, dropout=0, n_epochs=1000, is_lstm=True)
+    rnn = RNN(dp, lag=5, neurons=4, n_layers=1, dropout=0.2, n_epochs=1000, is_lstm=True)
 
     rnn.fit()
 
