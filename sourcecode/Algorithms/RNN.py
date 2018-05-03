@@ -216,7 +216,10 @@ class RNN:
         for train, test in self.__dp.split(n_folds, ActivityDataHeaders.START_TIME):
             self.fit(train, to_save=False)
 
-            truth = test[ActivityDataHeaders.LABEL]
+            batches = self.__create_batches(test)
+            _, truth = self.__flat(batches)
+            truth = self.__encoder.inverse_transform(truth.reshape((-1,)).astype(int))
+            truth = pd.DataFrame(truth)
 
             prediction = self.predict(test)
 
@@ -246,7 +249,7 @@ if __name__ == '__main__':
 
     rnn = RNN(dp, neurons=16, n_layers=3, dropout=0.5, n_epochs=1)
 
-    rnn.fit()
+    rnn.fit(to_save=False)
 
     predictions = rnn.predict(dp.data_processed)
 
