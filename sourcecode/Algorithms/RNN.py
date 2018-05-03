@@ -159,13 +159,11 @@ class RNN:
 
         batches = self.__create_batches(data)
 
-        validation_size = 0.3
-        validation_size = int(len(batches) * validation_size)
+        validation_size = 1 # number of days
 
         train_batches = batches[:-validation_size]
         validation_batches = batches[-validation_size:]
 
-        train_x, train_y = self.__flat(train_batches)
         validation_x, validation_y = self.__flat(validation_batches)
 
         cbacks = []
@@ -175,11 +173,18 @@ class RNN:
 
         cbacks.append(EarlyStopping(min_delta=1e-10, patience=25))
 
-        history = self.__model.fit(x=train_x, y=train_y, validation_data=(validation_x,validation_y),
-                                epochs=self.__n_epochs, shuffle=False, verbose=2, batch_size=None,
-                                callbacks=cbacks)
+        batch_idx = 0
+        for epoch in range(self.__n_epochs):
+            train_x, train_y = self.__flat(np.array([train_batches[batch_idx]]))
+            self.__model.fit(x=train_x, y=train_y, validation_data=(validation_x,validation_y), initial_epoch=epoch,
+                             epochs=epoch+1, shuffle=False, verbose=2, batch_size=None, callbacks=cbacks)
 
-        return history
+            # self.__model.reset_states()
+
+            batch_idx += 1
+            batch_idx %= len(train_batches)
+
+        return self.__model.history
 
     def predict(self, x):
         batches = self.__create_batches(x)
@@ -247,14 +252,14 @@ if __name__ == '__main__':
 
     dp.data_processed = Parser().data()
 
-    rnn = RNN(dp, neurons=16, n_layers=3, dropout=0.5, n_epochs=1)
+    rnn = RNN(dp, lag=5, neurons=8, n_layers=2, dropout=0, n_epochs=1000, is_lstm=True)
 
-    rnn.fit(to_save=False)
+    rnn.fit()
 
-    predictions = rnn.predict(dp.data_processed)
+    #predictions = rnn.predict(dp.data_processed)
 
-    f1, precision, recall, matrices = rnn.evaluate()
+    #f1, precision, recall, matrices = rnn.evaluate()
 
-    print(f'F1        = {f1}')
-    print(f'Precision = {precision}')
-    print(f'Recall    = {recall}')
+    #print(f'F1        = {f1}')
+    #print(f'Precision = {precision}')
+    #print(f'Recall    = {recall}')
