@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 from random import random
 
-from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.preprocessing import LabelEncoder, StandardScaler, LabelBinarizer
 from Headers import ActivityDataHeaders
 from Metrics import Metrics
 from Parser import Parser, DatasetPath
@@ -52,6 +52,7 @@ class RNN:
         self.__cutoff = 5 # 5 am
         self.__encoder = LabelEncoder()
         #self.__scaler = StandardScaler()
+        self.__hot_encoder = LabelBinarizer()
 
         # Encode the activities so they can act as index
         self.__encoder.fit(dp.data_processed[ActivityDataHeaders.LABEL].unique())
@@ -85,7 +86,7 @@ class RNN:
             model.add(self.__rnn_layer(self.__neurons, recurrent_dropout=self.__dropout, stateful=True,
                                        activation=self.__activation, recurrent_activation=self.__activation_r))
 
-        model.add(Dense(1))
+        model.add(Dense(self.__dp.data_processed[ActivityDataHeaders.LABEL].unique().shape[0], activation='softmax'))
 
         # For now, let's not pass any further parameters
         model.compile(loss='mean_squared_error', optimizer=RMSprop(), metrics=['accuracy'])
@@ -109,6 +110,7 @@ class RNN:
         #ends = activities_df[[label, ActivityDataHeaders.END_TIME]]
 
         starts[label] = starts[label].apply(lambda x: self.__encoder.transform([x])[0])
+        self.__hot_encoder.fit(starts[label])
         #starts[label] = self.__scaler.fit_transform(starts[label].values.reshape((-1, 1)))
 
         #ends = ends.rename(index=str, columns={ActivityDataHeaders.END_TIME: ActivityDataHeaders.START_TIME})
@@ -167,6 +169,8 @@ class RNN:
 
         x = x.reshape((x.shape[0],self.__lag,1))
 
+        y = self.__hot_encoder.transform(y)
+
         return x, y
 
     def load_model(self, file: str):
@@ -207,6 +211,12 @@ class RNN:
 
         predictions = self.__model.predict(x, batch_size=1)
 
+        predictions = self.__hot_encoder.inverse_transform(predictions)
+
+        return predictions
+
+        """
+
         #predictions = self.__scaler.inverse_transform(predictions)
 
         # Cast to int
@@ -227,6 +237,7 @@ class RNN:
             new_predictions = np.hstack((new_predictions, label))
 
         return new_predictions
+        """
 
     def evaluate(self, n_folds=10):
         matrices = []
@@ -268,7 +279,7 @@ if __name__ == '__main__':
 
     dp.data_processed = Parser().data()
 
-    rnn = RNN(dp, lag=5, neurons=512, n_layers=8, dropout=0.1, n_epochs=1000, is_lstm=True)
+    rnn = RNN(dp, lag=5, neurons=8, n_layers=8, dropout=0.1, n_epochs=1000, is_lstm=True)
 
     rnn.fit()
 
