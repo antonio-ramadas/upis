@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 from random import random
 
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 from Headers import ActivityDataHeaders
 from Metrics import Metrics
 from Parser import Parser, DatasetPath
@@ -16,6 +16,7 @@ import datetime
 import time
 import pandas as pd
 import numpy as np
+import keras.optimizers as optimizers
 
 
 class Resetter(Callback):
@@ -33,7 +34,6 @@ class Resetter(Callback):
             self.__batch_idx %= len(self.__batches)
 
             self.model.reset_states()
-        return
 
 
 class RNN:
@@ -51,6 +51,7 @@ class RNN:
         self.__model = self.__create_model()
         self.__cutoff = 5 # 5 am
         self.__encoder = LabelEncoder()
+        #self.__scaler = StandardScaler()
 
         # Encode the activities so they can act as index
         self.__encoder.fit(dp.data_processed[ActivityDataHeaders.LABEL].unique())
@@ -87,7 +88,7 @@ class RNN:
         model.add(Dense(1))
 
         # For now, let's not pass any further parameters
-        model.compile(loss='mean_squared_error', optimizer=RMSprop(lr=0.001), metrics=['accuracy'])
+        model.compile(loss='mean_squared_error', optimizer=RMSprop(), metrics=['accuracy'])
 
         return model
 
@@ -108,6 +109,7 @@ class RNN:
         #ends = activities_df[[label, ActivityDataHeaders.END_TIME]]
 
         starts[label] = starts[label].apply(lambda x: self.__encoder.transform([x])[0])
+        #starts[label] = self.__scaler.fit_transform(starts[label].values.reshape((-1, 1)))
 
         #ends = ends.rename(index=str, columns={ActivityDataHeaders.END_TIME: ActivityDataHeaders.START_TIME})
 
@@ -203,7 +205,9 @@ class RNN:
 
         x, _ = self.__flat(batches)
 
-        predictions = self.__model.predict(x)
+        predictions = self.__model.predict(x, batch_size=1)
+
+        #predictions = self.__scaler.inverse_transform(predictions)
 
         # Cast to int
         predictions = predictions.astype(int)
@@ -264,7 +268,7 @@ if __name__ == '__main__':
 
     dp.data_processed = Parser().data()
 
-    rnn = RNN(dp, lag=5, neurons=4, n_layers=1, dropout=0.2, n_epochs=1000, is_lstm=True)
+    rnn = RNN(dp, lag=5, neurons=512, n_layers=8, dropout=0.1, n_epochs=1000, is_lstm=True)
 
     rnn.fit()
 

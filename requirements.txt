@@ -1,5 +1,6 @@
-keras
-numpy
+numpy==1.14.3
 pandas==0.22.0
 scikit_learn==0.19.1
-scipy
+scipy==0.19.1
+tensorflow==1.8.0
+Keras==2.1.6
