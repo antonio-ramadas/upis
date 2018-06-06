@@ -287,12 +287,12 @@ if __name__ == '__main__':
 
     rnn = RNN(dp, lag=5, neurons=64, n_layers=2, dropout=0, n_epochs=1, is_lstm=True)
 
-    # rnn.fit()
+    rnn.fit()
 
-    # predictions = rnn.predict(dp.data_processed)
+    predictions = rnn.predict(dp.data_processed)
 
-    f1, precision, recall, matrices = rnn.evaluate()
+    # f1, precision, recall, matrices = rnn.evaluate()
 
-    print(f'F1        = {f1}')
-    print(f'Precision = {precision}')
-    print(f'Recall    = {recall}')
+    # print(f'F1        = {f1}')
+    # print(f'Precision = {precision}')
+    # print(f'Recall    = {recall}')

@@ -4,7 +4,7 @@ from Parser import DatasetPath
 from DataProcessor import DataProcessor
 from Headers import SensorProcessedDataHeaders, NaiveBayesType
 from sklearn.preprocessing import LabelBinarizer
-from sklearn.naive_bayes import MultinomialNB
+from sklearn.naive_bayes import MultinomialNB, BernoulliNB, GaussianNB
 from Metrics import *
 import numpy as np
 import pandas as pd
@@ -17,7 +17,7 @@ class NaiveBayes:
         self.__type    = type
         # __encoder is currently only being used in MULTIPLE
         self.__encoder = LabelBinarizer()
-        self.__nb      = MultinomialNB()
+        self.__nb      = GaussianNB()
 
     def __add_devices_with_encoder(self, x, devices):
         """
@@ -138,7 +138,7 @@ if __name__ == '__main__':
     print('Naive Bayes')
 
     filename = 'sensors'
-    path = DatasetPath.MIT1
+    path = DatasetPath.MIT2
 
     dp = DataProcessor(path=path)
 
@@ -147,7 +147,7 @@ if __name__ == '__main__':
         nb = NaiveBayes(dp, type)
         nb.fit(dp.data_processed)
 
-        print(nb.predict(dp.process_sensors().iloc[[0]]))
+        # print(nb.predict(dp.process_sensors().iloc[[0]]))
 
         f1, precision, recall, matrices = nb.evaluate()
 
