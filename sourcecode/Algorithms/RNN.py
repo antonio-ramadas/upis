@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 from random import random
 
-from sklearn.preprocessing import LabelEncoder, StandardScaler, LabelBinarizer
+from sklearn.preprocessing import LabelEncoder, LabelBinarizer
 from Headers import ActivityDataHeaders
 from Metrics import Metrics
 from Parser import Parser, DatasetPath
@@ -16,8 +16,8 @@ import datetime
 import time
 import pandas as pd
 import numpy as np
-import keras.optimizers as optimizers
 from keras import backend as K
+
 
 class Resetter(Callback):
     def __init__(self, batches):
@@ -36,6 +36,7 @@ class Resetter(Callback):
             self.model.reset_states()
 
 
+# Straight from https://github.com/keras-team/keras/issues/5400#issuecomment-314747992
 def f1(y_true, y_pred):
     def recall(y_true, y_pred):
         """Recall metric.
@@ -67,6 +68,7 @@ def f1(y_true, y_pred):
     recall = recall(y_true, y_pred)
     return 2 * ((precision * recall) / (precision + recall + K.epsilon()))
 
+
 class RNN:
     def __init__(self, dp: DataProcessor, activation="tanh", activation_r="hard_sigmoid", lag=5, neurons=512,
                  dropout=0.2, n_layers=1, n_epochs=500, is_lstm=True):
@@ -80,17 +82,14 @@ class RNN:
         self.__n_epochs = n_epochs
         self.__rnn_layer = LSTM if is_lstm else GRU
         self.__model = self.__create_model()
-        self.__cutoff = 5 # 5 am
+        self.__cutoff = 5  # 5 am
         self.__encoder = LabelEncoder()
-        #self.__scaler = StandardScaler()
         self.__hot_encoder = LabelBinarizer()
 
         # Encode the activities so they can act as index
         self.__encoder.fit(dp.data_processed[ActivityDataHeaders.LABEL].unique())
 
         self.__hot_encoder.fit(self.__encoder.transform(self.__encoder.classes_))
-
-        #self.__hot_encoder.fit(dp.data_processed[ActivityDataHeaders.LABEL].unique())
 
         file_name = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
 
@@ -123,7 +122,6 @@ class RNN:
 
         model.add(Dense(self.__dp.data_processed[ActivityDataHeaders.LABEL].unique().shape[0], activation='softmax'))
 
-        # For now, let's not pass any further parameters
         model.compile(loss='categorical_crossentropy', optimizer=RMSprop(), metrics=[f1,'accuracy'])
 
         return model
@@ -142,14 +140,9 @@ class RNN:
         label = ActivityDataHeaders.LABEL
 
         starts = activities_df[[label, ActivityDataHeaders.START_TIME]]
-        #ends = activities_df[[label, ActivityDataHeaders.END_TIME]]
 
         starts[label] = starts[label].apply(lambda x: self.__encoder.transform([x])[0])
-        #starts[label] = self.__scaler.fit_transform(starts[label].values.reshape((-1, 1)))
 
-        #ends = ends.rename(index=str, columns={ActivityDataHeaders.END_TIME: ActivityDataHeaders.START_TIME})
-
-        #activities_df = starts.append(ends)
         activities_df = starts
 
         # By sorting, when an activity first shows, then it starts, and when it shows again, then it is its end
@@ -235,7 +228,7 @@ class RNN:
         if to_save:
             cbacks.append(TensorBoard(log_dir="logs/{} {}".format(self.__file_name, random())))
 
-        #cbacks.append(EarlyStopping(min_delta=1e-3, patience=25))
+        # cbacks.append(EarlyStopping(min_delta=1e-3, patience=25))
         cbacks.append(Resetter(train_batches))
 
         return self.__model.fit(x=train_x, y=train_y, validation_data=(validation_x,validation_y),
@@ -251,30 +244,6 @@ class RNN:
         predictions = self.__hot_encoder.inverse_transform(predictions)
 
         return predictions
-
-        """
-
-        #predictions = self.__scaler.inverse_transform(predictions)
-
-        # Cast to int
-        predictions = predictions.astype(int)
-
-        n_classes = len(self.__encoder.classes_)
-
-        new_predictions = np.empty(0)
-
-        # This loop is because inverse_transform of Label Encoder throws an error if the number was never seen
-        # https://github.com/scikit-learn/scikit-learn/issues/10552
-        # This is just an workaround
-        for idx in range(predictions.shape[0]):
-            elem = predictions[idx]
-
-            label = self.__encoder.inverse_transform(elem)[0] if 0 <= elem[0] < n_classes else ''
-
-            new_predictions = np.hstack((new_predictions, label))
-
-        return new_predictions
-        """
 
     def evaluate(self, n_folds=10):
         matrices = []
@@ -318,9 +287,9 @@ if __name__ == '__main__':
 
     rnn = RNN(dp, lag=5, neurons=64, n_layers=2, dropout=0, n_epochs=1, is_lstm=True)
 
-    #rnn.fit()
+    # rnn.fit()
 
-    #predictions = rnn.predict(dp.data_processed)
+    # predictions = rnn.predict(dp.data_processed)
 
     f1, precision, recall, matrices = rnn.evaluate()
 
