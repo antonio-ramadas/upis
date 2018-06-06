@@ -17,7 +17,7 @@ import time
 import pandas as pd
 import numpy as np
 import keras.optimizers as optimizers
-
+from keras import backend as K
 
 class Resetter(Callback):
     def __init__(self, batches):
@@ -35,6 +35,37 @@ class Resetter(Callback):
 
             self.model.reset_states()
 
+
+def f1(y_true, y_pred):
+    def recall(y_true, y_pred):
+        """Recall metric.
+
+        Only computes a batch-wise average of recall.
+
+        Computes the recall, a metric for multi-label classification of
+        how many relevant items are selected.
+        """
+        true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+        possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
+        recall = true_positives / (possible_positives + K.epsilon())
+        return recall
+
+    def precision(y_true, y_pred):
+        """Precision metric.
+
+        Only computes a batch-wise average of precision.
+
+        Computes the precision, a metric for multi-label classification of
+        how many selected items are relevant.
+        """
+        true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+        predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
+        precision = true_positives / (predicted_positives + K.epsilon())
+        return precision
+
+    precision = precision(y_true, y_pred)
+    recall = recall(y_true, y_pred)
+    return 2 * ((precision * recall) / (precision + recall + K.epsilon()))
 
 class RNN:
     def __init__(self, dp: DataProcessor, activation="tanh", activation_r="hard_sigmoid", lag=5, neurons=512,
@@ -56,6 +87,10 @@ class RNN:
 
         # Encode the activities so they can act as index
         self.__encoder.fit(dp.data_processed[ActivityDataHeaders.LABEL].unique())
+
+        self.__hot_encoder.fit(self.__encoder.transform(self.__encoder.classes_))
+
+        #self.__hot_encoder.fit(dp.data_processed[ActivityDataHeaders.LABEL].unique())
 
         file_name = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
 
@@ -89,7 +124,7 @@ class RNN:
         model.add(Dense(self.__dp.data_processed[ActivityDataHeaders.LABEL].unique().shape[0], activation='softmax'))
 
         # For now, let's not pass any further parameters
-        model.compile(loss='mean_squared_error', optimizer=RMSprop(), metrics=['accuracy'])
+        model.compile(loss='categorical_crossentropy', optimizer=RMSprop(), metrics=[f1,'accuracy'])
 
         return model
 
@@ -110,7 +145,6 @@ class RNN:
         #ends = activities_df[[label, ActivityDataHeaders.END_TIME]]
 
         starts[label] = starts[label].apply(lambda x: self.__encoder.transform([x])[0])
-        self.__hot_encoder.fit(starts[label])
         #starts[label] = self.__scaler.fit_transform(starts[label].values.reshape((-1, 1)))
 
         #ends = ends.rename(index=str, columns={ActivityDataHeaders.END_TIME: ActivityDataHeaders.START_TIME})
@@ -198,7 +232,7 @@ class RNN:
         if to_save:
             cbacks.append(TensorBoard(log_dir="logs/{} {}".format(self.__file_name, random())))
 
-        cbacks.append(EarlyStopping(min_delta=1e-3, patience=25))
+        #cbacks.append(EarlyStopping(min_delta=1e-3, patience=25))
         cbacks.append(Resetter(train_batches))
 
         return self.__model.fit(x=train_x, y=train_y, validation_data=(validation_x,validation_y),
@@ -250,7 +284,7 @@ class RNN:
 
             batches = self.__create_batches(test)
             _, truth = self.__flat(batches)
-            truth = self.__encoder.inverse_transform(truth.reshape((-1,)).astype(int))
+            truth = self.__hot_encoder.inverse_transform(truth)
             truth = pd.DataFrame(truth)
 
             prediction = self.predict(test)
@@ -279,14 +313,14 @@ if __name__ == '__main__':
 
     dp.data_processed = Parser().data()
 
-    rnn = RNN(dp, lag=5, neurons=8, n_layers=8, dropout=0.1, n_epochs=1000, is_lstm=True)
+    rnn = RNN(dp, lag=5, neurons=64, n_layers=2, dropout=0, n_epochs=1, is_lstm=True)
 
-    rnn.fit()
+    #rnn.fit()
 
     #predictions = rnn.predict(dp.data_processed)
 
-    #f1, precision, recall, matrices = rnn.evaluate()
+    f1, precision, recall, matrices = rnn.evaluate()
 
-    #print(f'F1        = {f1}')
-    #print(f'Precision = {precision}')
-    #print(f'Recall    = {recall}')
+    print(f'F1        = {f1}')
+    print(f'Precision = {precision}')
+    print(f'Recall    = {recall}')
