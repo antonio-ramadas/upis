@@ -192,7 +192,7 @@ if __name__ == '__main__':
     print('Dataset processor')
 
     filename = 'sensors'
-    path = DatasetPath.MIT1
+    path = DatasetPath.MIT2
 
     dp = DataProcessor(path=path)
     dp.save(filename)
