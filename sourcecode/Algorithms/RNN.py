@@ -191,6 +191,9 @@ class RNN:
 
             batches[idx] = np.hstack((new_batch,y))
 
+        # Filter empty batches
+        batches = list(filter(len, batches))
+
         return batches
 
     def __flat(self, batches):
